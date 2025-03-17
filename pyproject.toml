@@ -1,0 +1,179 @@
+[project]
+name = "pyeast"
+version = "0.1.0"
+description = "A python tool kit for yeast engineering"
+requires-python = "==3.12.*"
+authors = [
+    { name = "Thomas Loan", email = "Tom.Loan27@gmail.com" },
+]
+
+dependencies = [
+    "loguru>=0.5.3",
+    "pyfastcopy>=1.0.3",
+    "python-dotenv>=1.0.1",
+    "click>=8.0.0",
+    "rich>=10.0.0",
+    "prompt_toolkit>=3.0.0",
+    "biopython>=1.79",
+    "pillow>=8.0.0",
+    "pandas>=1.5.0",
+    "primer3-py>=0.6.0",
+    "matplotlib>=3.5.0",
+    "dna-features-viewer>=3.1.0",
+    "openpyxl>=3.1.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/python_template_uv"]
+
+[tool.uv]
+package = true
+dev-dependencies = [
+    "pytest>=7.4.4",
+    "pip-licenses>=3.5.5",
+    "pylint>=2.17.7",
+    "pyproject-flake8>=0.0.1a5",
+    "poethepoet>=0.24.4",
+    "nbmake>=1.5.3",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.4.5",
+    "mypy>=1.9.0",
+    "nbstripout>=0.6.2",
+    "pyinstaller>=6.5.0",
+    "pyrsistent>=0.20.0",
+    "pytest-dependency>=0.6.0",
+    "pre-commit>=4.0.1",
+    "Sphinx>=5,<7",
+    "sphinx-rtd-theme>=1.0.0",
+    "myst-parser>=1.0.0",
+    "rst-to-myst[sphinx]>=0.4.0",
+    "pytest-timeout>=2.3.1",
+    "twine>=5.1.1",
+    "toml-cli>=0.7.0",
+    "pathspec>=0.12.1",
+]
+
+
+
+[tool.uv.sources]
+python_template_uv = { path = "src/python_template_uv/**/*.py" }
+
+# Scripts for the main entrypoints of the package.
+# These will be installed into the virtualenv's bin/ directory and run with `uv run example_script`.
+# These also allow you to `pipx install` this project in a sandbox for cli use.
+[project.scripts]
+pyeast = "pyeast.cli.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Automation of common build tasks etc.  Run with: `poe <target>`, eg. `poe clean`.
+# See https://github.com/nat-n/poethepoet for details.
+[tool.poe.tasks]
+rename_template = {cmd = "uv run python src/initialise_project.py", help = "Rename the template project to your project name.  Run this immediately after cloning the template!"}
+init = { shell = "uv sync; uv run pre-commit install;", help = "(Re)initialise the project, e.g. install updated dependencies (e.g. after a pull/merge)", interpreter = "posix" }
+run = { cmd = "uv run python src/python_template_uv/example.py", help = "Run the project" }
+clean = { shell = "rm -rf .coverage .mypy_cache .pytest_cache dist ./**/__pycache__ docs/build/ dist docs/build docs/source/_static docs/source/wpf.*.rst", help = "Clean up build artifacts", interpreter = "posix" }
+clean_outputs = { shell = "rm -rf output/ results/", help = "Cleans output dirs: output/ & results/", interpreter = "posix" }
+lint = { shell = "uv run --with pre-commit-uv git add .pre-commit-config.yaml pyproject.toml & pre-commit run", help = "Run pre-commit hooks" }
+alint = { shell = "uv run --with pre-commit-uv git add *.yaml *.yml *.toml *.py && pre-commit run", help = "(alint==add-and-lint) Git-adds config & code, then run pre-commit hooks", interpreter = "posix" }
+lint_all = { shell = "uv run --with pre-commit-uv git add *.yaml *.yml *.toml *.py && pre-commit run --all-files", help = "Git-adds config & code, then run pre-commit hooks on all files", interpreter = "posix" }
+test = { cmd = "uv run pytest --cov-report html --cov-report term-missing --cov=src/ tests", help = "Run unit tests with pytest" }
+publish = { shell = "uv build; uv run twine upload --repository-url $PUBLISH_URL -u $PUBLISH_USER -p $PUBLISH_PASSWORD dist/*", help = "Publish the package to private pypi repo.  Set $PUBLISH_URL, $PUBLISH_USER, $PUBLISH_PASSWORD in your environment beforehand.", interpreter = "posix" }
+version = { shell = "version=`toml get --toml-path pyproject.toml project.version`; echo $version", help = "Get the current version from pyproject.toml" }
+release = { shell = "version=`toml get --toml-path pyproject.toml project.version` && git tag -a v$version -m 'Release version $version' && git push --tags", help = "Parse version from pyproject.toml, create and push tag to trigger release action. Test versions should be of the form X.Y.ZrcN (e.g. 0.2.1rc2)." }
+docker_build = { cmd = "docker compose build --progress plain", help = "Build the docker compose images" }
+docker_run = { cmd = "docker compose run --rm --build main", help = "Run the main docker compose container" }
+docker_test = { cmd = "docker compose run --rm test", help = "Run the test docker compose container" }
+docker_bash = { cmd = "docker compose run --rm --entrypoint bash main", help = "Run the main docker compose container" }
+doc.sequence = ["_doc_dir", "_pyreverse", "_apidoc", "_sphinx", "show_doc"]
+doc.help = "Build the documentation"
+show_doc = { expr = "webbrowser.open('file://' + str(pathlib.Path('docs/build/index.html').resolve()))", imports = ["webbrowser", "pathlib"], help = "Open the documentation in a browser (experimental)." }
+
+# Internal tasks used by other tasks, not callable directly
+_doc_dir = { script = "os:makedirs('docs/source/_static', exist_ok=True)" }
+_pyreverse = { cmd = "pyreverse --output-directory docs/source/_static/ --output html src/python_template_uv" } # FIXME `--output png` for UML diagrams only works if native graphviz is installed
+_licenses = { cmd = "pip-licenses -f md --output-file docs/source/licenses.md" }
+_apidoc = { cmd = "sphinx-apidoc -f -o docs/source/ src/" }
+_sphinx = { cmd = "sphinx-build -b html docs/source docs/build" }
+
+
+# Config for various pre-commit checks are below
+# Ruff linting rules - see https://github.com/charliermarsh/ruff and https://beta.ruff.rs/docs/rules/
+[tool.ruff]
+target-version = "py39"
+line-length = 150
+
+
+[tool.ruff.lint]
+# Add specific rule codes/groups here to ignore them, or add a '#noqa' comment to the line of code to skip all checks.
+ignore = [
+    "PLR", # complexity rules
+]
+
+# Option 1: use basic rules only.
+select = [
+    "E", # pycodestyle errors
+    "W", # pycodestyle warnings
+    "F", # pyflakes
+    "UP", # pyupgrade
+    "N", # pep8 naming
+    "I", # isort
+    "TID", # tidy imports
+    "UP", # pyupgrade
+    "PD", # pandas style
+    "NPY", # numpy style
+    "C90", # code complexity
+    #    "PL", # pylint
+]
+
+# Ruff rule-specific options:
+[tool.ruff.lint.mccabe]
+max-complexity = 12 # increase max function 'complexity'
+
+
+[tool.mypy]
+# Static type-checking. Debug with `pre-commit run mypy`.
+# This config will only enforce typing if you choose to add type annotations. It will ignore code without any annotations.
+# Cheat sheet: https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html
+# Good guide: https://breadcrumbscollector.tech/mypy-how-to-use-it-in-my-project/
+
+# SET TO FALSE TO ENABLE MYPY
+# 'false' enables basic checks on optional type hints
+ignore_errors = false
+
+warn_unused_configs = true
+ignore_missing_imports = true
+pretty = false
+exclude = "src/tests/**/*.py"
+files = ["src/**/*.py"]
+implicit_reexport = true
+
+# Uncomment to enable more checks - requiring type hints to be used everywhere.
+strict_optional = true
+warn_unused_ignores = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unreachable = true
+warn_redundant_casts = true
+
+# these options are quite restrictive, disabled
+disallow_any_generics = true
+no_implicit_reexport = true
+
+# See https://bandit.readthedocs.io/en/latest/man/bandit.html?highlight=recursive#options and https://bandit.readthedocs.io/en/latest/config.html?highlight=pyproject.toml#bandit-settings
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "scripts"]
+skips = ["B101", "B301", "B403", "B404", "B501"]
+exclude = ["*_test.py", "test_*.py"]
+
+# see https://docs.pytest.org/en/6.2.x/customize.html and https://docs.pytest.org/en/6.2.x/reference.html#ini-options-ref
+[tool.pytest.ini_options]
+filterwarnings = ["ignore::DeprecationWarning"]
+# default pytest args for coverage report to console+html (cov-report), reporting long-running tests (durations-min), native stacktraces (tb=native), and jupyer notebook running (nbmake)
+addopts = '-s --cov-report term-missing --durations=0 --durations-min=5.0 --tb=native --timeout=300 --nbmake --nbmake-timeout=5000 src/'

@@ -1,0 +1,87 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+# Run with `uv run pre-commit run --all-files`
+repos:
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.3
+    hooks:
+    - id: actionlint
+#    - id: actionlint-docker # enable this to get the full set of checks on Windows.  Requires docker.
+
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.5
+    hooks:
+      - id: remove-crlf
+      - id: remove-tabs
+      - id: insert-license
+        files: \.py$
+        args:
+          - --license-filepath
+          - COPYRIGHT.txt
+          - --use-current-year
+          - --no-extra-eol
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.7.1
+    hooks:
+      # Run the formatter.
+      - id: ruff-format
+        types_or: [ python, pyi, jupyter ]
+      # Run the linter.
+      - id: ruff
+        types_or: [ python, pyi, jupyter ]
+        args: [ --fix, --exit-non-zero-on-fix ]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [ "mypy_extensions"]
+
+  # Strip output from all jupyter notebooks, except those stored in the docs/ directory.
+  # We consider everything except documentation to be source code, and source notebooks should not contain outputs.
+  - repo: local
+    hooks:
+      - id: nbstripout
+        name: nbstripout
+        entry: uv run nbstripout --extra-keys metadata.kernelspec
+        require_serial: true
+        language: system
+        files: ^(?!docs\/).*\.ipynb$  # python regex for paths to include - everything except docs/**/*.ipynb
+
+  # Bandit is a tool for finding common security issues in Python code. See https://github.com/PyCQA/bandit
+  # Tip: add `#nosec` to lines of code to ignore checks for that line
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.10
+    hooks:
+      - id: bandit
+        # args to use pyproject.toml for project-specific config, run on all files, only show >= medium severity (-ll), and >= medium confidence (-ii), output to screen, silence logging (-q) and aggregate errors by file.
+        args: [ "-c", "pyproject.toml", "--recursive", "-ll", "-ii", "--format", "screen", "-q", "–aggregate", "file", "src/" ]
+        additional_dependencies: [ "bandit[toml]" ]
+
+  # A few basic checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+        exclude_types:
+          - jupyter
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [ '--maxkb=2048' ]
+      - id: mixed-line-ending
+      - id: detect-private-key
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: name-tests-test
+        args: [ '--pytest-test-first' ]
+  #      - id: no-commit-to-branch # breaks first commit if enabled, turn on afterwards
+  #        args: [ '--branch', 'master', '--branch', 'main' ]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
