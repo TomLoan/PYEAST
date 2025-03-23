@@ -32,7 +32,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 ```
 
 # Clone the repo
-git clone https://bitbucket.csiro.au/scm/~loa012/uv_python.git 
+git clone https://github.com/TomLoan/PYEAST.git
 
 ### Using PYEAST 
 
