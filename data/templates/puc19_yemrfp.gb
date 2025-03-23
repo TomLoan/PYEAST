@@ -1,0 +1,186 @@
+LOCUS       pUC19_yEMRFP            3382 bp ds-DNA     circular     16-OCT-2022
+DEFINITION  .
+FEATURES             Location/Qualifiers
+     source          1..402
+                     /label="source"
+                     /ApEinfo_revcolor="#c6c9d1"
+                     /ApEinfo_fwdcolor="#c6c9d1"
+     CDS             complement(146..402)
+                     /label="lacZalpha CDS"
+                     /ApEinfo_revcolor="#b7e6d7"
+                     /ApEinfo_fwdcolor="#b7e6d7"
+     gene            complement(146..402)
+                     /label="lacZalpha gene"
+                     /ApEinfo_revcolor="#b7e6d7"
+                     /ApEinfo_fwdcolor="#b7e6d7"
+     CDS             complement(239..307)
+                     /label="LacZ alpha"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+     primer_bind     378..395
+                     /label="M13-fwd"
+                     /ApEinfo_revcolor="#85dae9"
+                     /ApEinfo_fwdcolor="#85dae9"
+     misc_feature    396..402
+                     /label="lacZalpha misc_feature"
+                     /ApEinfo_revcolor="#ff9ccd"
+                     /ApEinfo_fwdcolor="#ff9ccd"
+     CDS             408..1118
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+                     /translation="MVSKGEEDNMAIIKEFMRFKVHMEGSVNGHEFEIEGEGEGRPYEGTQTAKLKVTKGGPLPFAWDILSPQFMYGSKAYVKHPADIPDYLKLSFPEGFKWERVMNFEDGGVVTVTQDSSLQDGEFIYKVKLRGTNFPSDGPVMQKKTMGWEASSERMYPEDGALKGEIKQRLKLKDGGHYDAEVKTTYKAKKPVQLPGAYNVNIKLDITSHNEDYTIVEQYERAEGRHSTGGMDELYK*"
+     source          1126..3382
+                     /label="source"
+                     /ApEinfo_revcolor="#c6c9d1"
+                     /ApEinfo_fwdcolor="#c6c9d1"
+     misc_feature    1126..1148
+                     /label="lacZalpha misc_feature"
+                     /ApEinfo_revcolor="#ff9ccd"
+                     /ApEinfo_fwdcolor="#ff9ccd"
+     gene            complement(1126..1165)
+                     /label="lacZalpha gene"
+                     /ApEinfo_revcolor="#b7e6d7"
+                     /ApEinfo_fwdcolor="#b7e6d7"
+     CDS             complement(1126..1165)
+                     /label="lacZalpha CDS"
+                     /ApEinfo_revcolor="#b7e6d7"
+                     /ApEinfo_fwdcolor="#b7e6d7"
+     primer_bind     complement(1157..1177)
+                     /label="M13-rev"
+                     /ApEinfo_revcolor="#85dae9"
+                     /ApEinfo_fwdcolor="#85dae9"
+     misc_binding    complement(1183..1205)
+                     /label="LacO"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+     promoter        complement(1209..1239)
+                     /label="lac promoter"
+                     /ApEinfo_revcolor="#c7b0e3"
+                     /ApEinfo_fwdcolor="#c7b0e3"
+     -10_signal      complement(1210..1215)
+                     /label="Plac promoter (drives lacZalpha;counter-clockwise); TATGTT"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+     -35_signal      complement(1234..1239)
+                     /label="Plac promoter (drives lacZalpha;counter-clockwise); TTTACA"
+                     /ApEinfo_revcolor="#85dae9"
+                     /ApEinfo_fwdcolor="#85dae9"
+     protein_bind    complement(1259..1271)
+                     /label="CAP protein binding site"
+                     /ApEinfo_revcolor="#c7b0e3"
+                     /ApEinfo_fwdcolor="#c7b0e3"
+     rep_origin      complement(1545..2227)
+                     /label="ColE1 origin"
+                     /ApEinfo_revcolor="#9eafd2"
+                     /ApEinfo_fwdcolor="#9eafd2"
+     misc_RNA        complement(1563..2115)
+                     /label="RNAII transcript (complementary strand)"
+                     /ApEinfo_revcolor="#c6c9d1"
+                     /ApEinfo_fwdcolor="#c6c9d1"
+     rep_origin      complement(1563..2151)
+                     /label="pMB1 origin of replication (counter-clockwise)(RNAII -35 to RNA/DNA switch point)"
+                     /ApEinfo_revcolor="#85dae9"
+                     /ApEinfo_fwdcolor="#85dae9"
+     -35_signal      1969..1974
+                     /label="RNAI promoter (clockwise); TTGAAG"
+                     /ApEinfo_revcolor="#b7e6d7"
+                     /ApEinfo_fwdcolor="#b7e6d7"
+     -10_signal      1991..1996
+                     /label="RNAI promoter (clockwise); GCTACA"
+                     /ApEinfo_revcolor="#f58a5e"
+                     /ApEinfo_fwdcolor="#f58a5e"
+     misc_RNA        2005..2112
+                     /label="RNAI transcript"
+                     /ApEinfo_revcolor="#b1ff67"
+                     /ApEinfo_fwdcolor="#b1ff67"
+     -10_signal      complement(2125..2130)
+                     /label="RNAII promoter (counter-clockwise); CGTAAT"
+                     /ApEinfo_revcolor="#ffef86"
+                     /ApEinfo_fwdcolor="#ffef86"
+     -35_signal      complement(2146..2151)
+                     /label="RNAII promoter (counter-clockwise); TTGAGA"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+     CDS             complement(2322..3182)
+                     /label="bla CDS"
+                     /ApEinfo_revcolor="#c7b0e3"
+                     /ApEinfo_fwdcolor="#c7b0e3"
+     gene            complement(2322..3182)
+                     /label="bla gene"
+                     /ApEinfo_revcolor="#b4abac"
+                     /ApEinfo_fwdcolor="#b4abac"
+     CDS             complement(2325..2984)
+                     /label="AmpR"
+                     /ApEinfo_revcolor="#ffef86"
+                     /ApEinfo_fwdcolor="#ffef86"
+     sig_peptide     complement(3114..3182)
+                     /label="bla sig_peptide"
+                     /ApEinfo_revcolor="#c6c9d1"
+                     /ApEinfo_fwdcolor="#c6c9d1"
+     -10_signal      complement(3226..3231)
+                     /label="bla promoter (counter-clockwise); GAGACA"
+                     /ApEinfo_revcolor="#d6b295"
+                     /ApEinfo_fwdcolor="#d6b295"
+     -35_signal      complement(3247..3252)
+                     /label="bla promoter (counter-clockwise); TTCAAA"
+                     /ApEinfo_revcolor="#faac61"
+                     /ApEinfo_fwdcolor="#faac61"
+ORIGIN
+        1 tcgcgcgttt cggtgatgac ggtgaaaacc tctgacacat gcagctcccg gagacggtca
+       61 cagcttgtct gtaagcggat gccgggagca gacaagcccg tcagggcgcg tcagcgggtg
+      121 ttggcgggtg tcggggctgg cttaactatg cggcatcaga gcagattgta ctgagagtgc
+      181 accatatgcg gtgtgaaata ccgcacagat gcgtaaggag aaaataccgc atcaggcgcc
+      241 attcgccatt caggctgcgc aactgttggg aagggcgatc ggtgcgggcc tcttcgctat
+      301 tacgccagct ggcgaaaggg ggatgtgctg caaggcgatt aagttgggta acgccagggt
+      361 tttcccagtc acgacgttgt aaaacgacgg ccagtgaatt cgagctcATG GTTTCAAAAG
+      421 GTGAAGAAGA TAATATGGCT ATTATTAAAG AATTTATGAG ATTTAAAGTT CATATGGAAG
+      481 GTTCAGTTAA TGGTCATGAA TTTGAAATTG AAGGTGAAGG TGAAGGTAGA CCATATGAAG
+      541 GTACTCAAAC TGCTAAATTG AAAGTTACTA AAGGTGGTCC ATTACCATTT GCTTGGGATA
+      601 TTTTGTCACC ACAATTTATG TATGGTTCAA AAGCTTATGT TAAACATCCA GCTGATATTC
+      661 CAGATTATTT AAAATTGTCA TTTCCAGAAG GTTTTAAATG GGAAAGAGTT ATGAATTTTG
+      721 AAGATGGTGG TGTTGTTACT GTTACTCAAG ATTCATCATT ACAAGATGGT GAATTTATTT
+      781 ATAAAGTTAA ATTGAGAGGT ACTAATTTTC CATCAGATGG TCCAGTTATG CAAAAAAAAA
+      841 CTATGGGTTG GGAAGCTTCA TCAGAAAGAA TGTATCCAGA AGATGGTGCT TTAAAAGGTG
+      901 AAATTAAACA AAGATTGAAA TTAAAAGATG GTGGTCATTA TGATGCTGAA GTTAAAACTA
+      961 CTTATAAAGC TAAAAAACCA GTTCAATTAC CAGGTGCTTA TAATGTTAAT ATTAAATTGG
+     1021 ATATTACTTC ACATAATGAA GATTATACTA TTGTTGAACA ATATGAAAGA GCTGAAGGTA
+     1081 GACATTCAAC TGGTGGTATG GATGAATTAT ATAAATAAgg atccgtcgac ctgcaggcat
+     1141 gcaagcttgg cgtaatcatg gtcatagctg tttcctgtgt gaaattgtta tccgctcaca
+     1201 attccacaca acatacgagc cggaagcata aagtgtaaag cctggggtgc ctaatgagtg
+     1261 agctaactca cattaattgc gttgcgctca ctgcccgctt tccagtcggg aaacctgtcg
+     1321 tgccagctgc attaatgaat cggccaacgc gcggggagag gcggtttgcg tattgggcgc
+     1381 tcttccgctt cctcgctcac tgactcgctg cgctcggtcg ttcggctgcg gcgagcggta
+     1441 tcagctcact caaaggcggt aatacggtta tccacagaat caggggataa cgcaggaaag
+     1501 aacatgtgag caaaaggcca gcaaaaggcc aggaaccgta aaaaggccgc gttgctggcg
+     1561 tttttccata ggctccgccc ccctgacgag catcacaaaa atcgacgctc aagtcagagg
+     1621 tggcgaaacc cgacaggact ataaagatac caggcgtttc cccctggaag ctccctcgtg
+     1681 cgctctcctg ttccgaccct gccgcttacc ggatacctgt ccgcctttct cccttcggga
+     1741 agcgtggcgc tttctcatag ctcacgctgt aggtatctca gttcggtgta ggtcgttcgc
+     1801 tccaagctgg gctgtgtgca cgaacccccc gttcagcccg accgctgcgc cttatccggt
+     1861 aactatcgtc ttgagtccaa cccggtaaga cacgacttat cgccactggc agcagccact
+     1921 ggtaacagga ttagcagagc gaggtatgta ggcggtgcta cagagttctt gaagtggtgg
+     1981 cctaactacg gctacactag aagaacagta tttggtatct gcgctctgct gaagccagtt
+     2041 accttcggaa aaagagttgg tagctcttga tccggcaaac aaaccaccgc tggtagcggt
+     2101 ggtttttttg tttgcaagca gcagattacg cgcagaaaaa aaggatctca agaagatcct
+     2161 ttgatctttt ctacggggtc tgacgctcag tggaacgaaa actcacgtta agggattttg
+     2221 gtcatgagat tatcaaaaag gatcttcacc tagatccttt taaattaaaa atgaagtttt
+     2281 aaatcaatct aaagtatata tgagtaaact tggtctgaca gttaccaatg cttaatcagt
+     2341 gaggcaccta tctcagcgat ctgtctattt cgttcatcca tagttgcctg actccccgtc
+     2401 gtgtagataa ctacgatacg ggagggctta ccatctggcc ccagtgctgc aatgataccg
+     2461 cgagacccac gctcaccggc tccagattta tcagcaataa accagccagc cggaagggcc
+     2521 gagcgcagaa gtggtcctgc aactttatcc gcctccatcc agtctattaa ttgttgccgg
+     2581 gaagctagag taagtagttc gccagttaat agtttgcgca acgttgttgc cattgctaca
+     2641 ggcatcgtgg tgtcacgctc gtcgtttggt atggcttcat tcagctccgg ttcccaacga
+     2701 tcaaggcgag ttacatgatc ccccatgttg tgcaaaaaag cggttagctc cttcggtcct
+     2761 ccgatcgttg tcagaagtaa gttggccgca gtgttatcac tcatggttat ggcagcactg
+     2821 cataattctc ttactgtcat gccatccgta agatgctttt ctgtgactgg tgagtactca
+     2881 accaagtcat tctgagaata gtgtatgcgg cgaccgagtt gctcttgccc ggcgtcaata
+     2941 cgggataata ccgcgccaca tagcagaact ttaaaagtgc tcatcattgg aaaacgttct
+     3001 tcggggcgaa aactctcaag gatcttaccg ctgttgagat ccagttcgat gtaacccact
+     3061 cgtgcaccca actgatcttc agcatctttt actttcacca gcgtttctgg gtgagcaaaa
+     3121 acaggaaggc aaaatgccgc aaaaaaggga ataagggcga cacggaaatg ttgaatactc
+     3181 atactcttcc tttttcaata ttattgaagc atttatcagg gttattgtct catgagcgga
+     3241 tacatatttg aatgtattta gaaaaataaa caaatagggg ttccgcgcac atttccccga
+     3301 aaagtgccac ctgacgtcta agaaaccatt attatcatga cattaaccta taaaaatagg
+     3361 cgtatcacga ggccctttcg tc
+//
