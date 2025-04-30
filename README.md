@@ -1,15 +1,6 @@
-# Set of tools for yeast cloning, built on the CSIRO uv-python tempalte. 
-
-Basic template for a python project using the uv toolchain
-
-[![Unit Tests](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/poetry-tests.yml/badge.svg)](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/poetry-tests.yml)
-[![Docker Unit Tests](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/docker-image.yml/badge.svg)](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/docker-image.yml)
-[![Release](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/release.yml/badge.svg)](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/release.yml)
+# Set of tools for yeast cloning, built on the CSIRO uv-python template. 
 
 ## Quick start:
-
-
-
 
 ### Prerequisites
 
