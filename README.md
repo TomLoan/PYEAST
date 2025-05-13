@@ -28,9 +28,9 @@ git clone https://github.com/TomLoan/PYEAST.git
 ### Using PYEAST 
 
 Run PYEAST in Command line
-'''shell
+```shell
 uv run pyeast
-'''
+```
 uv will handle the package management and create athe required virtual environment in the local directory. 
 Once this process is complete a range of commands will be printed to the terminal, use uv run pyeast command --help for more information on running each command
 
