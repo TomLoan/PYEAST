@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/946400824.svg)](https://doi.org/10.5281/zenodo.15393309)
+
 # Set of tools for yeast cloning, built on the CSIRO uv-python template. 
 
 ## Quick start:
