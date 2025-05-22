@@ -43,5 +43,4 @@ del: This script designs DNA fragments that can be used to delete regions of S. 
 replace: Similar to del this script designs DNA fragments that can be used to replace regions of S. cerevisiae gDNA with a method based on that described by Akada et al 2006 (Yeast 23(5):399-405)
 batch: regenate instructions files for previously designed tar and integrate command outputs stored in the output file. You might need to do this for example after ordering primers or adding templates sequences to ./data/templates. 
 
-For more details see our BioRxiv 
-Link
+For more details see our [pre-print](https://doi.org/10.1101/2025.05.19.655004) on BioRxiv 
