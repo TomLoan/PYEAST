@@ -25,7 +25,9 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 ```
 
 # Clone the repo
+```shel
 git clone https://github.com/TomLoan/PYEAST.git
+```
 
 ### Using PYEAST 
 
