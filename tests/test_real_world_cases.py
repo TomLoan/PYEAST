@@ -38,8 +38,8 @@ def test_tar_designer_real_world_case():
 
     #skip if test data doesn't exist yet 
     input_dir = Path('test/data')/test_case_dir/'input'
-    if not input_dir.exisits() or not any(input_dir.glob('*.fasta')): 
-        pytest.skip('Test data not yet set up')
+    # if not input_dir.exists() or not any(input_dir.glob('*.fasta')): 
+    #     pytest.skip('Test data not yet set up')
 
     #Load test sequences 
 
