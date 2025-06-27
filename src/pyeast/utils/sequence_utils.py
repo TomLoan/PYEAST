@@ -23,9 +23,6 @@ Sequence utilities for PYEAST.
 
 # ===========================================================================
 
-
-
-
 import os 
 import io
 import math
