@@ -217,7 +217,7 @@ def run_tar_interactive_mode(designer: TARDesigner):
         # Display instructions and confirm
         designer.display_instructions(instructions)
         
-        if not click.confirm("\nProceed with assembly?"):
+        if not click.confirm("\nProceed with assembly?"):       
             console.print("[yellow]Design cancelled[/yellow]")
             return
         
@@ -514,8 +514,8 @@ def run_deletion_interactive_mode(designer: DeletionDesigner):
             # Save primers
             forward_primer, reverse_primer = designer.screening_primers
             with open(f"{output_prefix}_screening_primers.tsv", 'w') as f:
-                f.write(f"{output_prefix}_ScreenF\t{forward_primer}\n")
-                f.write(f"{output_prefix}_ScreenR\t{reverse_primer}")
+                f.write(f"{output_prefix.split("\\")[1]}_ScreenF\t{forward_primer}\n")
+                f.write(f"{output_prefix.split("\\")[1]}_ScreenR\t{reverse_primer}")
                 
             # Generate and save map
             img_data, fig = visualise_genbank(f"{output_prefix}.gb")
@@ -656,8 +656,8 @@ def run_replace_interactive_mode(designer: ReplaceDesigner):
             # Save primers
             forward_primer, reverse_primer = designer.screening_primers
             with open(f"{output_prefix}_screening_primers.tsv", 'w') as f:
-                f.write(f"{output_prefix}_ScreenF\t{forward_primer}\n")
-                f.write(f"{output_prefix}_ScreenR\t{reverse_primer}")
+                f.write(f"{output_prefix.split("\\")[1]}_ScreenF\t{forward_primer}\n")
+                f.write(f"{output_prefix.split("\\")[1]}_ScreenR\t{reverse_primer}")
                 
             # Generate and save map
             img_data, fig = visualise_genbank(f"{output_prefix}.gb")
