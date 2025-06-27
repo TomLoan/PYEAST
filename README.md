@@ -1,15 +1,8 @@
-# Set of tools for yeast cloning, built on the CSIRO uv-python tempalte. 
+[![DOI](https://zenodo.org/badge/946400824.svg)](https://doi.org/10.5281/zenodo.15393309)
 
-Basic template for a python project using the uv toolchain
-
-[![Unit Tests](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/poetry-tests.yml/badge.svg)](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/poetry-tests.yml)
-[![Docker Unit Tests](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/docker-image.yml/badge.svg)](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/docker-image.yml)
-[![Release](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/release.yml/badge.svg)](https://github.com/csiro-energy-systems/python-template-uv/actions/workflows/release.yml)
+# Set of tools for yeast cloning, built on the CSIRO uv-python template. 
 
 ## Quick start:
-
-
-
 
 ### Prerequisites
 
@@ -32,14 +25,16 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 ```
 
 # Clone the repo
+```shel
 git clone https://github.com/TomLoan/PYEAST.git
+```
 
 ### Using PYEAST 
 
 Run PYEAST in Command line
-'''shell
+```shell
 uv run pyeast
-'''
+```
 uv will handle the package management and create athe required virtual environment in the local directory. 
 Once this process is complete a range of commands will be printed to the terminal, use uv run pyeast command --help for more information on running each command
 
@@ -50,5 +45,4 @@ del: This script designs DNA fragments that can be used to delete regions of S. 
 replace: Similar to del this script designs DNA fragments that can be used to replace regions of S. cerevisiae gDNA with a method based on that described by Akada et al 2006 (Yeast 23(5):399-405)
 batch: regenate instructions files for previously designed tar and integrate command outputs stored in the output file. You might need to do this for example after ordering primers or adding templates sequences to ./data/templates. 
 
-For more details see our BioRxiv 
-Link
+For more details see our [pre-print](https://doi.org/10.1101/2025.05.19.655004) on BioRxiv 

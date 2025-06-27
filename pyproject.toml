@@ -1,6 +1,6 @@
 [project]
 name = "pyeast"
-version = "0.1.0"
+version = "1.0.0"
 description = "A python tool kit for yeast engineering"
 requires-python = "==3.12.*"
 authors = [
