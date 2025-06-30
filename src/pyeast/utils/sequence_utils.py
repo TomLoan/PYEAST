@@ -213,6 +213,8 @@ def write_circular_instructions(rationalized_primers: Dict[str, Dict],
                 amplicon_length
             ]
             instructions.append(instruction)
+        else: 
+            print(f"primer(s) missing for {part_name}")
     
     return instructions
 
