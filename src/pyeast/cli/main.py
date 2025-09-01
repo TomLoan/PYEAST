@@ -130,12 +130,18 @@ def get_component_dir() -> Path:
     base_dir = Path("data/component libraries")
     console.print(base_dir)
     
+    #todo add a private data option
+    # #check for private data and include in the options
+    # private_components = Path("data/private/component libraries")
+    # if private_components.exists(): 
+    #     console.print(private_components)
+
     if not base_dir.exists():
         console.print("[red]Error: Default components directory not found[/red]")
         raise click.Abort()
         
     # Create completer from subdirectories
-    subdirs = [d.name for d in base_dir.iterdir() if d.is_dir()]
+    subdirs = [d.name for d in base_dir.iterdir() if d.is_dir()] #+ [d.name for d in private_components.iterdir() if d.is_dir()]
     dir_completer = WordCompleter(subdirs, ignore_case=True)
     
     session = PromptSession()
@@ -154,7 +160,7 @@ def get_component_dir() -> Path:
                 completer=dir_completer
             )
             
-            selected_dir = base_dir / user_input
+            selected_dir = base_dir / user_input 
             if selected_dir.exists() and selected_dir.is_dir():
                 return selected_dir
             else:
