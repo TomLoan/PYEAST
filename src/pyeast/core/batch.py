@@ -45,6 +45,7 @@ from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.shortcuts import confirm
 import openpyxl
 import csv
+import click
 
 from ..utils.sequence_utils import (
     get_templates,
@@ -64,6 +65,16 @@ class BatchDesigner:
     in parallel, including primer design, template selection, and generating
     machine-readable instructions for liquid handling robots.
     """
+    EPMOTION_HEADER = [
+                ['Labware', 'Src.Barcode', 'Src.List Name', 'Dest.Barcode', 'Dest.List name', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
+            ]
+    JANUS_HEADER = [['Asp plate', 'Asp pos', 'Vol', 'Disp plate', 'Disp pos']]
     
     def __init__(self,
                  reuse_limit = 5,
@@ -106,6 +117,18 @@ class BatchDesigner:
         self.pcr_reactions = {}
         self.reuse_limit = reuse_limit
         self.batched_reactions = []
+        
+        
+        # self.epmotion_header = [
+        #         ['Labware', 'Src.Barcode', 'Src.List Name', 'Dest.Barcode', 'Dest.List name', '', '', ''],
+        #         ['', '', '', '', '', '', '', ''],
+        #         ['', '', '', '', '', '', '', ''],
+        #         ['', '', '', '', '', '', '', ''],
+        #         ['', '', '', '', '', '', '', ''],
+        #         ['', '', '', '', '', '', '', ''],
+        #         ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
+        #     ]
+        # self.janus_header = ['Asp plate', 'Asp pos', 'Vol', 'Disp plate', 'Disp pos']
         
         # Ensure output directories exist
         self.output_folder.mkdir(exist_ok=True)
@@ -207,7 +230,7 @@ class BatchDesigner:
                     is_circular = record.annotations.get('topology', '').lower() == 'circular'
                     self.console.print(f"• {name} ({'Circular' if is_circular else 'Linear'})")
                     
-                if confirm("\nProceed with these constructs?"):
+                if click.confirm("\nProceed with these constructs?"):
                     # Store selections in class state
                     self.selected_constructs = {
                         name: self.available_constructs[name] 
@@ -1012,15 +1035,9 @@ class BatchDesigner:
         all_primer_plates = sorted(f_primer_plates | r_primer_plates)
         
         # Create epMotion instructions list starting with required headers
-        epmotion_instructions = [
-            ['Labware', 'Src.Barcode', 'Src.List Name', 'Dest.Barcode', 'Dest.List name', '', '', ''],
-            ['', '', '', '', '', '', '', ''],
-            ['', '', '', '', '', '', '', ''],
-            ['', '', '', '', '', '', '', ''],
-            ['', '', '', '', '', '', '', ''],
-            ['', '', '', '', '', '', '', ''],
-            ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
-        ]
+
+        epmotion_instructions = [row[:] for row in self.EPMOTION_HEADER]
+        
         
         # Process each PCR reaction from human instructions
         # Skip header row [1:]
@@ -1078,6 +1095,97 @@ class BatchDesigner:
             writer.writerows(epmotion_instructions)
         
         return str(output_file)
+    
+    def generate_janus_instructions(self, timestamp: str) -> str:
+        """"Generate instructions for the Janus liquid handling robot
+        
+        Creates a CSV file containing transfer instructions for primers and templates
+        formatted specifically for the Janus robot. The instructions include:
+        - Header information
+        - Forward primer transfers
+        - Reverse primer transfers
+        - Template transfers
+        
+        Column order in human_instructions:
+        ['','Asp plate', 'Asp Pos', 'Vol', 'Disp plate', 'Disp Pos']
+        
+        Args:
+            timestamp (str): Timestamp for file naming
+            
+        Returns:
+            str: Path to the generated instructions file
+            
+        Raises:
+            ValueError: If assembly instructions haven't been generated
+            ValueError: If template information is missing
+        """
+        if not hasattr(self, 'human_instructions'):
+            raise ValueError("No instructions found. Run generate_human_instructions first.")
+        
+        # Get unique primer plate barcodes from human instructions
+        # Skip header row [1:]
+        f_primer_plates = {row[4] for row in self.human_instructions[1:] if row[4] != "N/A"}
+        r_primer_plates = {row[7] for row in self.human_instructions[1:] if row[7] != "N/A"}
+        
+        # Combine and sort all unique plate barcodes for consistent positions
+        # all_primer_plates = sorted(f_primer_plates | r_primer_plates)
+        
+        # Create Janus instructions list starting with required headers
+        janus_instructions = [row[:] for row in self.JANUS_HEADER]
+        
+        # Process each PCR reaction from human instructions
+        # Skip header row [1:]
+        for i, row in enumerate(self.human_instructions[1:], 1):
+            # Get destination well based on position in list (A1, A2, etc.)
+            row_letter = chr(65 + ((i-1) // 12))  # A, B, C, etc.
+            col_number = ((i-1) % 12) + 1        # 1, 2, 3, etc.
+            pcr_well = f"{row_letter}{col_number}"
+            
+            # Add forward primer transfer
+            if row[4] != "N/A":  # F_Plate exists
+                janus_instructions.append([
+                    row[4],  # F_Plate (Barcode ID)
+                    row[5],  # F_Well (Source)
+                    '1', # Volume in µL
+                    "Assembly plate",  # Destination plate ID (single plate for now)
+                    ## to do: link assembly plate # to batch number for v. large assemblies
+                    pcr_well,  # PCR well position (e.g., A1, B5)
+                    
+                    
+                ])
+                
+            # Add reverse primer transfer
+            if row[7] != "N/A":  # R_Plate exists
+                janus_instructions.append([
+                    row[7],  # R_Plate (Barcode ID)
+                    row[8],  # R_Well (Source)
+                    '1',     # Volume in µL
+                    "Assembly plate",  # Destination plate ID place holder  
+                        ## to do: link assembly plate # to batch number for v. large assemblies
+                    pcr_well,  # PCR well position (e.g., A1, B5) 
+                ])
+                
+            # Add template transfer if template exists
+            if row[9] != "Not found":  # Template exists
+                template_plate, template_well = self._get_template_position(row[9])
+                if template_plate and template_well:
+                    janus_instructions.append([
+                        template_plate,  # Barcode ID
+                        template_well,  # Source well
+                        '1',
+                        "Assembly plate",  # Destination plate ID
+                        ## to do: link assembly plate # to batch number for v. large assemblies
+                        pcr_well,  # PCR well position (e.g., A1, B5)
+                    ])
+        
+        # Save instructions to CSV
+        output_file = self.instructions_folder / f"{timestamp}_janus_instructions.csv"
+        with open(output_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(janus_instructions)
+        
+        return str(output_file)
+        
     
     def _get_template_position(self, template_name: str) -> Tuple[Optional[str], Optional[str]]:
         """Find the plate and well position for a given template.
@@ -1155,7 +1263,7 @@ class BatchDesigner:
         if not hasattr(self, 'assembly_groups'):
             raise ValueError("No assembly groups found. Run generate_assembly_groups first.")
             
-        if machine_type.lower() not in ['epmotion']:
+        if machine_type.lower() not in ['epmotion', 'janus']:
             raise ValueError(f"Unsupported machine type: {machine_type}")
         
         def well_num_to_a1(well_num: int) -> str:
@@ -1177,15 +1285,7 @@ class BatchDesigner:
         
         if machine_type.lower() == 'epmotion':
             # Create epMotion format instructions
-            instructions = [
-                ['Labware', 'Src.Barcode', 'Src.List Name', 'Dest.Barcode', 'Dest.List name', '', '', ''],
-                ['', '', '', '', '', '', '', ''],
-                ['', '', '', '', '', '', '', ''],
-                ['', '', '', '', '', '', '', ''],
-                ['', '', '', '', '', '', '', ''],
-                ['', '', '', '', '', '', '', ''],
-                ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
-            ]
+            instructions = [row[:] for row in self.EPMOTION_HEADER]
             
             # Process each assembly
             for assembly in assembly_data:
@@ -1208,11 +1308,38 @@ class BatchDesigner:
                     ])
             
             # Save instructions
-            output_file = self.instructions_folder / f"{timestamp}_assembly_epmotion_instructions.csv"
-            with open(output_file, 'w', newline='') as f:
+            assembly_file = self.instructions_folder / f"{timestamp}_assembly_epmotion_instructions.csv"
+            with open(assembly_file, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerows(instructions)
                 
-            return str(output_file)
+            return str(assembly_file)
                 
-        # Add support for other machines here as needed
+        if machine_type.lower() == 'janus': 
+            # Create janus format instructions
+            instructions = [row[:] for row in self.JANUS_HEADER]
+            
+            # Process each assembly
+            for assembly in assembly_data:
+                batch_num = assembly[0]  # Batch number
+                construct = assembly[1]  # Construct name
+                required_wells = [w.strip().replace('Well ', '') for w in assembly[2].split(',')]  # Get well numbers
+                
+                # Add transfers for each required PCR product
+                for well_num in required_wells:
+                    source_well = well_num_to_a1(well_num)
+                    instructions.append([
+                        f"plate {str(batch_num)}", # Source plate is batch number
+                        source_well,               # Source well in A1-H12 format
+                        "2",                       # Volume in µL (typical for yeast assembly)
+                        "Assembly plate",          # name for the destination plate
+                        assembly_wells[construct] # Destination well
+                    ])
+            
+            # Save instructions
+            assembly_file = self.instructions_folder / f"{timestamp}_assembly_janus_instructions.csv"
+            with open(assembly_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerows(instructions)
+                
+            return str(assembly_file)

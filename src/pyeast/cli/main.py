@@ -43,6 +43,7 @@ from ..core.integration import IntegrationDesigner
 from ..core.deletion import DeletionDesigner
 from ..core.replace import ReplaceDesigner
 from ..core.batch import BatchDesigner
+from ..core.gg_lvl1 import gg_lvl1Designer
 
 from .. utils.visualisation import visualise_genbank, save_figure
 
@@ -99,30 +100,54 @@ def get_output_prefix() -> str:
             if click.confirm("\nCancel output name selection?"):
                 raise click.Abort()
 
-def handle_machine_instructions(designer: BatchDesigner, timestamp: str) -> None:
+def handle_machine_instructions(designer: BatchDesigner) -> None:
     """Ask user if they want to generate machine instructions and handle the response.
     
     Args:
         designer: BatchDesigner instance with completed assembly instructions
-        timestamp: Current timestamp for file naming
     """
+    session = PromptSession() 
+
     if click.confirm("\nWould you like to generate machine instructions for liquid handling?"):
-        # For now we only have epMotion, but structure allows easy expansion
-        machines = ['epMotion']
+        # Select from available machines
+        machines = ['epMotion', 'Janus']
         
         print("\nAvailable liquid handling machines:")
         for i, machine in enumerate(machines, 1):
             print(f"{i}. {machine}")
-            
-        if len(machines) == 1:
-            print("\nCurrently only epMotion is supported.")
+
+        completer = WordCompleter(machines, ignore_case=True)
+
+        selection = session.prompt("Which machine would you like to use? \n", completer = completer).strip().lower()
+
+        if selection == "epmotion":
             if click.confirm("Generate epMotion instructions?"):
                 try:
-                    output_file = designer.generate_epmotion_instructions(timestamp)
-                    print(f"\nMachine instructions saved to: {output_file}")
+                    timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
+                    #write instructions for the PCR set up
+                    designer.generate_epmotion_instructions(timestamp)
+                    #output_file = designer.generate_epmotion_instructions(timestamp)
+                    #write instructions for the assembly transforations
+                    designer.generate_machine_assembly_instructions('epmotion', timestamp)
+                    #print(f"\nMachine instructions saved to: {output_file}")
                 except Exception as e:
                     print(f"\nError generating machine instructions: {str(e)}")
 
+        if selection == "janus":
+            if click.confirm("Generate Janus instructions?"):
+                try:
+                    timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
+                    #write instructions for the PCR set up
+                    designer.generate_janus_instructions(timestamp)
+                    #output_file = designer.generate_janus_instructions(timestamp)
+                    #write instructions for the assembly transforations
+                    designer.generate_machine_assembly_instructions('janus', timestamp)
+                    #print(f"\nMachine instructions saved to: {output_file}")
+                except Exception as e:
+                    print(f"\nError generating machine instructions: {str(e)}")
+           
+    else: 
+        pass
 
 def get_component_dir() -> Path:
     """Get component directory with simple autocompletion"""
@@ -775,17 +800,11 @@ def run_batch_interactive_mode(designer: BatchDesigner):
             progress.update(task_id, completed=True)
 
         # Optionally generate machine instructions
-        if click.confirm("\nGenerate machine instructions for epMotion?"):
-            task_id = progress.add_task("Generating machine instructions...", total=None)
-            try:
-                timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
-                designer.generate_epmotion_instructions(timestamp)
-                designer.generate_machine_assembly_instructions('epmotion', timestamp)
-            except ValueError as e:
-                progress.update(task_id, completed=True)
-                console.print(f"\n[red]{str(e)}[/red]")
-                return
-            progress.update(task_id, completed=True)
+        progress.update(task_id, completed=True)
+           
+        handle_machine_instructions(designer) 
+           
+        progress.update(task_id, completed=True)
 
         console.print("\n[bold green]✓[/bold green] Batch design complete!")
         
@@ -800,6 +819,34 @@ def run_batch_interactive_mode(designer: BatchDesigner):
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise click.Abort()
+    
+def run_gg_lvl1_interactive_mode(designer: gg_lvl1Designer):
+    """Run TAR design in interactive mode"""
+    try:
+        # Get components directory
+        components_dir = get_component_dir()
+        
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
+            # Load and process sequences
+            task_id = progress.add_task("Loading sequences...", total=None)
+            sequences = designer.load_and_get_sequences(components_dir)
+            progress.update(task_id, completed=True)
+            
+            if not sequences:
+                console.print("[red]No sequences found in directory[/red]")
+                return
+            
+        # Display sequences and get assembly order
+        designer.print_sequence_grid(sequences)
+        assembly_order = designer.get_assembly_order(sequences)
+        
+        if not assembly_order:
+            return
+    except click.Abort:
+        console.print("\n[yellow]Operation cancelled[/yellow]")
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        raise
     
 @click.group()
 def cli():
@@ -1009,7 +1056,21 @@ def batch(reuse_limit):
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
         raise click.Abort()
-    
+
+@cli.command()
+def gglvl1():
+    """Design golden gate cloning experiments in Saccharomyces cerevisiae
+    \b\n
+    """
+    try:
+        designer = gg_lvl1Designer()
+        run_gg_lvl1_interactive_mode(designer)
+    except click.Abort:
+        raise
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        raise click.Abort()
+
 if __name__ == '__main__':
     cli()
     
