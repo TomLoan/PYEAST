@@ -1058,7 +1058,7 @@ def batch(reuse_limit):
         raise click.Abort()
 
 @cli.command()
-def gglvl1():
+def ggytk1():
     """Design golden gate cloning experiments in Saccharomyces cerevisiae
     \b\n
     """
