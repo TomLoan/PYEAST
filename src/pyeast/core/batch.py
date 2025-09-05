@@ -1,4 +1,4 @@
-# Copyright CSIRO 2025. Thomas Loan 
+# Copyright ANU 2025. Thomas Loan 
 # See LICENSE for full GpLv2 license. 
 
 # This program is free software: you can redistribute it and/or modify 
@@ -117,20 +117,6 @@ class BatchDesigner:
         self.pcr_reactions = {}
         self.reuse_limit = reuse_limit
         self.batched_reactions = []
-        
-        
-        # self.epmotion_header = [
-        #         ['Labware', 'Src.Barcode', 'Src.List Name', 'Dest.Barcode', 'Dest.List name', '', '', ''],
-        #         ['', '', '', '', '', '', '', ''],
-        #         ['', '', '', '', '', '', '', ''],
-        #         ['', '', '', '', '', '', '', ''],
-        #         ['', '', '', '', '', '', '', ''],
-        #         ['', '', '', '', '', '', '', ''],
-        #         ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
-        #     ]
-        # self.janus_header = ['Asp plate', 'Asp pos', 'Vol', 'Disp plate', 'Disp pos']
-        
-        # Ensure output directories exist
         self.output_folder.mkdir(exist_ok=True)
         self.instructions_folder.mkdir(exist_ok=True)
     

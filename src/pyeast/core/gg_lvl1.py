@@ -31,6 +31,7 @@ Level 1 golden gate assemblies using the yeast Moclo standard from Lee et al 201
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
+from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord 
 from Bio.Seq import Seq
 from rich.console import Console
@@ -81,22 +82,29 @@ class gg_lvl1Designer:
         }
     
 
-    def __init__(self): 
+    def __init__(self, 
+                 gg_plasmids: Path = Path('data/gg plasmids/Yeast MoClo lvl 0')
+                 ): 
         """Inintialise a new gg_lvl1 designer. 
         
         Args:
-            homology_length: Length of homology regions to be added to primers (default: 25) 
-            annealing_temp: Target annealing temperature for primer design (default: 50)
+            gg_plasmids: Path to directory containing level 0 plasmid files (default: 'data/gg plasmids/Yeast MoClo lvl 0')
             """
+        # File paths 
+        self.gg_plasmids = gg_plasmids
         
+        # state storage
         self.console = Console()
         self.session = PromptSession()
         self.multiplex = False
         self.available_sequences = {}     # All loaded sequences
         self.assembly_sequences = []      # Sequences in assembly order may be multiple assemblies for multiplex work (list of lists)
-        self.assemblies_names = None
+        self.assemblies_names = None      # Part names stored as strings
         self.template_dict = {}           # Template information
-        self.final_assembled_sequence = None    # Final assembled sequence
+        self.repository = None            # dnacauldron object constructed from all lvl 0 parts plasmids for gg assembly
+        self.assembly = None              # Assembly object from dnacauldron
+        self.assembly_sim = None                # Simulation object from dnacauldron
+        self.final_assembly = None        # Final assembled sequence(s)
 
 
     def load_and_get_sequences(self, directory: Path) -> None: 
@@ -171,7 +179,7 @@ class gg_lvl1Designer:
                     self.console.print("[yellow]No sequences selected[/yellow]")
                     continue
 
-                #validate selections befor processing
+                #validate selections before processing
                 invalid_selections = []
                 for selection in selected: 
                     if selection.startswith("/all"): 
@@ -181,7 +189,7 @@ class gg_lvl1Designer:
                             invalid_selections.append(f"{selection} (no parts found with type '{part_type}')")
 
                     elif "/" in selection: 
-                        part_names = selection.split()
+                        part_names = selection.split('/')
                         for part_name in part_names: 
                             if part_name not in sequences: 
                                 invalid_selections.append(f"{part_name} (from multplex selection '{selection})")
@@ -264,39 +272,39 @@ class gg_lvl1Designer:
     
 
 
-    def get_seq_records(self): 
-        """"converts self.assembly_sequences to a list of SeqRecord lists with matching names
+    # def get_seq_records(self): 
+    #     """"converts self.assembly_sequences to a list of SeqRecord lists with matching names
         
-        Converts the list of assembly names lists into SeqRecord objects from self.available_seqeunces
-        Returns a list of lists of SeqRecords for both single and multiplex assemblies
+    #     Converts the list of assembly names lists into SeqRecord objects from self.available_seqeunces
+    #     Returns a list of lists of SeqRecords for both single and multiplex assemblies
 
-        Returns: 
-            List[List[SeqRecord]]: List of assemblies, each of which are lists of Seqrecord objects
-                    Single assembly: [[Seq1, Seq2, ..]]
-                    Multiplex assembly : [[Seq1, Seq2, ..][Seq1, Seq2a, ...]...]
+    #     Returns: 
+    #         List[List[SeqRecord]]: List of assemblies, each of which are lists of Seqrecord objects
+    #                 Single assembly: [[Seq1, Seq2, ..]]
+    #                 Multiplex assembly : [[Seq1, Seq2, ..][Seq1, Seq2a, ...]...]
         
-        Raises: 
-            ValueError: if no sequences have been seelcted for assembly
-            KeyError: if any sequence name in assemblies is not found in available sequences
-        """
-        if not hasattr(self, 'assemblies') or not self.assemblies_names:
-            raise ValueError("No assemblies selected. Please run get_assembly_order first.")
+    #     Raises: 
+    #         ValueError: if no sequences have been seelcted for assembly
+    #         KeyError: if any sequence name in assemblies is not found in available sequences
+    #     """
+    #     if not hasattr(self, 'assemblies') or not self.assemblies_names:
+    #         raise ValueError("No assemblies selected. Please run get_assembly_order first.")
         
-        if not self.available_sequences:
-            raise ValueError("No sequences available. Please load sequences first.")
+    #     if not self.available_sequences:
+    #         raise ValueError("No sequences available. Please load sequences first.")
         
-        #get the SeqRecords from the names and populate a list
-        for assembly in self.assemblies_names: 
-            seq_records = [] 
-            for seq_name in assembly: 
-                if seq_name not in self.available_sequences: 
-                    raise KeyError(f"Sequence {seq_name} not found in availble sequences")
-                seq_records.append(self.available_sequences[seq_name])
-            self.assembly_sequences.append(seq_records)
+    #     #get the SeqRecords from the names and populate a list
+    #     for assembly in self.assemblies_names: 
+    #         seq_records = [] 
+    #         for seq_name in assembly: 
+    #             if seq_name not in self.available_sequences: 
+    #                 raise KeyError(f"Sequence {seq_name} not found in availble sequences")
+    #             seq_records.append(self.available_sequences[seq_name])
+    #         self.assembly_sequences.append(seq_records)
         
-        return self.assembly_sequences 
+    #     return self.assembly_sequences 
     
-    def get_plasmid_names(self, plasmid_folder: Path) -> List[str]:  
+    def get_plasmid_names(self) -> List[str]:  
         """this will map the sequences in self.assembly_sequences onto plasmids containing those sequences
         in the speficied directory, sets self.plasmid_names = list[str] doe dnacauldron 
         assembly
@@ -312,23 +320,163 @@ class gg_lvl1Designer:
         """
         if not hasattr(self, 'assemblies_names') or not self.assemblies_names: 
             raise ValueError("No assemblies slected. Please run get_assembly_order first")
+        
+        if not hasattr(self, 'assemblies_names') or not self.assemblies_names: 
+            raise ValueError("No assembly sequence available. Plaease run get_seq_records first.")
+        
+        if not self.gg_plasmids.exists(): 
+            raise FileNotFoundError(F"Plasmid folder not found {self.gg_plasmids}")
+        
+        # Collect all the unique sequence names from all assemblies 
+        all_part_names = set() 
+        for assembly in self.assemblies_names: 
+            all_part_names.update(assembly)
 
-    def gg_assembly(self): 
+        part_sequences = {} 
+        for seq_name in all_part_names: 
+            if seq_name in self.available_sequences: 
+                part_sequences[seq_name] = self.available_sequences[seq_name].seq
+            
+        # Search plasmid files to find which contain each part 
+        part_to_plasmid = {}
+        plasmid_files = list(self.gg_plasmids.glob('*.gb')) + list(self.gg_plasmids.glob('*.gbk'))
+
+
+        self.console.print(f"[blue]Searching {len(plasmid_files)} plasmid files for part sequences...[/blue]")
+
+        for plasmid_file in plasmid_files:
+            try:
+                # Use parse to handle multiple records in a file
+                for plasmid_record in SeqIO.parse(plasmid_file, "genbank"):
+                    plasmid_seq = plasmid_record.seq.upper()
+                    
+                    # Check each part sequence against this plasmid
+                    for part_name, part_seq in part_sequences.items():
+                        if part_name not in part_to_plasmid:  # Only map if not already found
+                            part_seq_upper = part_seq.upper()
+                            # Check both forward and reverse complement
+                            if (part_seq_upper in plasmid_seq or 
+                                part_seq_upper.reverse_complement() in plasmid_seq):
+                                part_to_plasmid[part_name] = plasmid_file.stem  # Just filename without extension
+                                break  # Found the part, move to next part
+            
+            except Exception as e: 
+                self.console.print(f"[yellow]Warning could not read {plasmid_file}: {str(e)}[/yellow]")
+                continue 
+
+        # check for missing mappings
+        missing_parts = all_part_names - set(part_to_plasmid.keys())
+
+        if missing_parts: 
+            self.console.print(f"[red]Could not find plasmid containsin {', '.join(missing_parts)}[/red]")
+            raise RuntimeError(f"Parts not found in any plasmids: {missing_parts}")
+        
+        # Get unique plasmid names for assembly
+        required_plasmids = list(set(part_to_plasmid.values()))
+
+        # Store results 
+        self.part_to_plasmid_mapping = part_to_plasmid 
+        self.plasmid_names = required_plasmids
+
+        # Show mapping summary
+        self.console.print(f"[green]Successfully mapped {len(all_part_names)} parts to {len(required_plasmids)} plasmids[/green]")
+        
+        # # Show detailed mapping
+        # table = Table(title="Part to Plasmid Mapping")
+        # table.add_column("Part Name", style="cyan")
+        # table.add_column("Plasmid Name", style="yellow")
+        
+        # for part_name in sorted(all_part_names):
+        #     table.add_row(part_name, part_to_plasmid[part_name])
+        
+        # self.console.print(table)
+        
+        return self.plasmid_names
+        
+
+    def gg_assembly(self, assembly_name: str): 
         """Passes the set of plasmids in self.plasmid_names to dc.Type2RestrictionAssembly with 
         expected_constructs = len(self.assemblies_names), if there is warnings or errors it will 
         provide feedback on what went wrong and return the user to the sequence selection stage. 
         Sets self.final_final = AssemblySimulation object. Note this method doesn't know what the
         intention of the user is - that's restricted to the selection stage, but will check that 
-        the outcome is roughly as expected. With this method the order of entry won't matter. 
-        """
-        pass 
+        the outcome is roughly as expected. With this method the order of entry won't matter.
+        
+        Args: 
+            assembly_name - name for plasmids in output
 
-    def gg_save_output(self): 
-        """Saves the output of the assembly function, creating a new plasmid output file
-        single assemblies, or a folder full of .gb files (no images) for multiplex assemblies
+        Raises: 
+            ValueError: If no plasmids have been set 
+            ValueError: If no assemblies have been selected 
+            RuntimeError: If assembly simulation fails or produces unexpected results
         """
-        pass
-    
+
+        #Create repository from all available lvl 0 plasmids 
+        repository = dc.SequenceRepository()
+        repository.import_records(
+            folder = str(self.gg_plasmids)
+        )
+        self.repository = repository 
+        
+        # Create Type 2 restriction assembly with the required plasmids 
+        #  not sure if I'll need (all) the state storage for something or not
+        assembly = dc.Type2sRestrictionAssembly(
+            parts = self.plasmid_names,
+            name = assembly_name,
+            expected_constructs = len(self.assemblies_names), 
+            max_constructs = len(self.assemblies_names) + 1
+        )    
+        self.assembly = assembly 
+
+        simulation = assembly.simulate(sequence_repository = repository)
+        self.assembly_sim = simulation
+
+        self._validate_assembly_results(simulation, assembly)
+        return simulation
+
+
+    def _validate_assembly_results(self, simulation, assembly) -> None:
+        """Validate the assembly results from dnacauldron match the expected output""" 
+       
+        # Check for errors 
+        if simulation.errors:
+            self.console.print("[red]Assembly errors detected:[/red]") 
+            for error in simulation.errors: 
+                self.console.print(f"[red] - {error}[/red]")
+        
+        # Check for warnings 
+        if simulation.warnings: 
+            self.console.print("[yellow]Assembly warnings:[/yellow]")
+            for warning in simulation.warnings: 
+                self.console.print(f"[yellow] - {warning}[/yellow]")
+
+        # Check number of constructs produced
+        expected_constructs = len(self.assemblies_names)
+        actual_constructs = len(simulation.construct_records)
+        if actual_constructs != expected_constructs: 
+            self.console.print(f"[yellow]Expected {expected_constructs}, got {actual_constructs}[/yellow]")
+        elif actual_constructs == expected_constructs: 
+            self.console.print(f"generated {expected_constructs} constructs as expected using [blue]{assembly.enzyme}[/blue]")
+
+    def gg_save_output(self, output_prefix: str) -> None: 
+        """Saves the output of the assembly function, creating a new plasmid output file
+        single assemblies, or a folder full of .gb files (no images) for multiplex assemblies. 
+        Takes output from simulation object to write a full report. also uses the user input 
+        from output_prefix to overwirte assembly names with input1, input2 etc. 
+        Outputs a graphical representations of multiplex assemblies. 
+
+        Args: 
+            Output_prefix: path to output folder, 
+
+
+
+        """
+        reporter = dc.AssemblyReportWriter(include_part_records=False
+                                           )
+        self.assembly_sim.write_report(output_prefix, report_writer=reporter)
+        
+        
+
     def gg_instructions(self): 
         """Generates human readable and [optionally] machine specific instructions 
         this will just boil down to a table of what plasmids to include and where they are

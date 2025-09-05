@@ -51,7 +51,8 @@ console = Console()
 
 
 def get_output_prefix() -> str:
-    """Get output prefix from user - just the name, not path"""
+    """Get output prefix from user - just the name not path, 
+    make sure it'll be a vaild file name and  and return the full path"""
     session = PromptSession()
     output_dir = Path("output")
     
@@ -83,7 +84,8 @@ def get_output_prefix() -> str:
                 output_dir / f"{safe_name}_missing_primers.tsv",
                 output_dir / f"{safe_name}_all_primers.tsv",
                 output_dir / f"{safe_name}_screening_primers.tsv",
-                output_dir / f"{safe_name}.fasta"
+                output_dir / f"{safe_name}.fasta",
+                output_dir / safe_name
             ]
             
             existing = [f for f in potential_files if f.exists()]
@@ -91,7 +93,7 @@ def get_output_prefix() -> str:
                 console.print("[yellow]Warning: The following files already exist:[/yellow]")
                 for f in existing:
                     console.print(f"  - {f.name}")
-                if not click.confirm("Overwrite these files?"):
+                if not click.confirm("Risk overwriting these files?"):
                     continue
             
             return str(output_dir / safe_name)
@@ -835,18 +837,66 @@ def run_gg_lvl1_interactive_mode(designer: gg_lvl1Designer):
             if not sequences:
                 console.print("[red]No sequences found in directory[/red]")
                 return
-            
-        # Display sequences and get assembly order
-        designer.print_sequence_grid(sequences)
-        assembly_order = designer.get_assembly_order(sequences)
-        
-        if not assembly_order:
-            return
+        # Main workflow loop - returns suer to selection on failure
+        while True:
+             
+            try: 
+                # Display sequences and get assembly order
+                designer.print_sequence_grid(sequences)
+                assembly_order = designer.get_assembly_order(sequences)
+                
+                if not assembly_order: 
+                    console.print("[yellow]No assembly selected[{]/yellow]")
+                    return
+                
+                # Get an output prefix
+                output_path = get_output_prefix()
+                console.print(output_path)
+                prefix = output_path.split("\\")[1]
+                
+                # Convert to SeqRecord objects and map to plasmids
+                with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress: 
+                    task_id = progress.add_task("Assembling selected sequences...", total = None)
+                    plasmids_required = designer.get_plasmid_names()
+                    assembly_sim = designer.gg_assembly(prefix)
+                    progress.update(task_id, completes = True)
+                if assembly_sim.errors: 
+                    if click.confirm("Return to part selection?"): 
+                        #reset state and try again
+                        designer.assemblies_names = None
+                        designer.assembly_sequences = []
+                        designer.plasmid_names = []
+                        designer.part_to_plasmid_mapping = {}
+                        designer.assembly = None
+                        designer.assembly_sim = None
+                        continue 
+                    else: 
+                        console.print("[yellow]Golden Gate design cancelled[/yellow]")
+                        return         
+                # For Successful assembly ask about saving outputs 
+                console.print("[green]Assembly Successful![/green]")
+                if click.confirm("Save Outputs?"): 
+                    
+                    designer.gg_save_output(output_path)
+
+                #exit loop on successful assembly    
+                break
+
+            except KeyboardInterrupt: 
+                console.print("[yellow]Operation canceled[/yellow]")
+                return 
+            except Exception as e: 
+                console.print(f"[red]Unexpected error: {str(e)}[/red]")
+                if click.confirm("Return to part selection and try again?"): 
+                    continue 
+                else: 
+                    raise
+
     except click.Abort:
         console.print("\n[yellow]Operation cancelled[/yellow]")
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
-        raise
+    # except Exception as e:
+    #     console.print(f"[bold red]Error:[/bold red] {str(e)}")
+    #     return
     
 @click.group()
 def cli():
@@ -917,12 +967,12 @@ def integrate(homology_length):
               help='Length of upstream homology for recombination (default: 300)')
 @click.option('--downstream_homology_len',
               type=int,
-              default=200,
-              help='Length of downstream homology for recombination (default: 200)')
+              default=100,
+              help='Length of downstream homology for recombination (default: 100)')
 @click.option('--repeat_length',
               type=int,
-              default=160,
-              help='Length of repeat sequence for marker removal (default: 160)')
+              default=80,
+              help='Length of repeat sequence for marker removal (default: 80)')
 @click.option('--genome_file',
               type=click.Path(exists=True, path_type=Path),
               default=Path("data/templates/BY4741_Toronto_2012.fsa"),
@@ -976,8 +1026,8 @@ def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome
               help='Length of downstream homology for recombination (default: 200)')
 @click.option('--repeat_length',
               type=int,
-              default=160,
-              help='Length of repeat sequence for marker removal (default: 160)')
+              default=80,
+              help='Length of repeat sequence for marker removal (default: 80)')
 @click.option('--genome_file',
               type=click.Path(exists=True, path_type=Path),
               default=Path("data/templates/BY4741_Toronto_2012.fsa"),
