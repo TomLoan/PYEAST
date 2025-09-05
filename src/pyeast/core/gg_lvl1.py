@@ -296,18 +296,22 @@ class gg_lvl1Designer:
         
         return self.assembly_sequences 
     
-    def get_get_plasmid_names(self, plasmid_folder): 
+    def get_plasmid_names(self, plasmid_folder: Path) -> List[str]:  
         """this will map the sequences in self.assembly_sequences onto plasmids containing those sequences
-        in the speficied directory, sets self.plasmid_names = list[str]
+        in the speficied directory, sets self.plasmid_names = list[str] doe dnacauldron 
+        assembly
         
         Args: 
-        
+            plasmid_folder: Path to a directory containing level 0 plasmid files
         Returns: 
-        
+            List[str] of plasmid filenames (not paths) for dnacauldron assembly 
         Raises: 
-        
+            ValueError: If no assemblies have been selected
+            FileNotFoundError: If plasmid folder doesn't exist
+            RuntimeError: If parts cannot be mapped to plasmids
         """
-        pass 
+        if not hasattr(self, 'assemblies_names') or not self.assemblies_names: 
+            raise ValueError("No assemblies slected. Please run get_assembly_order first")
 
     def gg_assembly(self): 
         """Passes the set of plasmids in self.plasmid_names to dc.Type2RestrictionAssembly with 

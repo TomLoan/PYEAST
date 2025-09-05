@@ -1,0 +1,70 @@
+LOCUS       pYSD007                 1728 bp ds-DNA     circular     12-NOV-2023
+DEFINITION  .
+ACCESSION   <unknown id>
+VERSION     <unknown id>
+COMMENT     Encodes S. cerevisiae OST1 pre- signal peptide as a Type 3a’ part
+            to be used in the yeast secretion/display (YSD) extension of the
+            MoClo yeast toolkit (YTK) Vector backbone is the Yeast MoClo
+            toolkit entry vector pYTK001
+FEATURES             Location/Qualifiers
+     CDS             11..79
+                     /label="OST1 pre- SP"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+                     /translation="MMRQVWFSWIVGLFLCFFNVSSA"
+     misc_feature    14..79
+                     /label="Ost1 pre- Signal Sequence"
+                     /ApEinfo_revcolor="#9eafd2"
+                     /ApEinfo_fwdcolor="#9eafd2"
+     misc_feature    complement(89..197)
+                     /label="CamR Terminator"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+                     /ApEinfo_graphicformat="arrow_data {{0 1 2 0 0 -1} {} 0}width 5 offset 0"
+     CDS             complement(198..857)
+                     /label="CamR"
+                     /ApEinfo_revcolor="#0000ff"
+                     /ApEinfo_fwdcolor="#0000ff"
+                     /ApEinfo_graphicformat="arrow_data {{0 1 2 0 0 -1} {} 0}width 5 offset 0"
+                     /translation="MEKKITGYTTVDISQWHRKEHFEAFQSVAQCTYNQTVQLDITAFLKTVKKNKHKFYPAFIHILARLMNAHPEFRMAMKDGELVIWDSVHPCYTVFHEQTETFSSLWSEYHDDFRQFLHIYSQDVACYGENLAYFPKGFIENMFFVSANPWVSFTSFDLNVANMDNFFAPVFTMGKYYTQGDKVLMPLAIQVHHAVCDGFHVGRMLNELQQYCDEWQGGA*"
+     promoter        complement(858..962)
+                     /label="CamR Promoter"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+                     /ApEinfo_graphicformat="arrow_data {{0 1 2 0 0 -1} {} 0}width 5 offset 0"
+     rep_origin      complement(963..1726)
+                     /label="ColE1"
+                     /ApEinfo_revcolor="#7f7f7f"
+                     /ApEinfo_fwdcolor="#7f7f7f"
+                     /ApEinfo_graphicformat="arrow_data {{0 1 2 0 0 -1} {} 0}width 5 offset 0"
+ORIGIN
+        1 TCGGTCTCAT ATGATGAGGC AGGTTTGGTT CTCTTGGATT GTGGGATTGT TCCTATGTTT
+       61 TTTCAACGTG TCTTCTGCTt gagaccagac caataaaaaa cgcccggcgg caaccgagcg
+      121 ttctgaacaa atccagatgg agttctgagg tcattactgg atctatcaac aggagtccaa
+      181 gcgagctcga tatcaaatta cgccccgccc tgccactcat cgcagtactg ttgtaattca
+      241 ttaagcattc tgccgacatg gaagccatca caaacggcat gatgaacctg aatcgccagc
+      301 ggcatcagca ccttgtcgcc ttgcgtataa tatttgccca tggtgaaaac gggggcgaag
+      361 aagttgtcca tattggccac gtttaaatca aaactggtga aactcaccca gggattggct
+      421 gaaacgaaaa acatattctc aataaaccct ttagggaaat aggccaggtt ttcaccgtaa
+      481 cacgccacat cttgcgaata tatgtgtaga aactgccgga aatcgtcgtg gtattcactc
+      541 cagagcgatg aaaacgtttc agtttgctca tggaaaacgg tgtaacaagg gtgaacacta
+      601 tcccatatca ccagctcacc gtctttcatt gccatacgaa attccggatg agcattcatc
+      661 aggcgggcaa gaatgtgaat aaaggccgga taaaacttgt gcttattttt ctttacggtc
+      721 tttaaaaagg ccgtaatatc cagctgaacg gtctggttat aggtacattg agcaactgac
+      781 tgaaatgcct caaaatgttc tttacgatgc cattgggata tatcaacggt ggtatatcca
+      841 gtgatttttt tctccatttt agcttcctta gctcctgaaa atctcgataa ctcaaaaaat
+      901 acgcccggta gtgatcttat ttcattatgg tgaaagttgg aacctcttac gtgcccgatc
+      961 aatcatgacc aaaatccctt aacgtgagtt ttcgttccac tgagcgtcag accccgtaga
+     1021 aaagatcaaa ggatcttctt gagatccttt ttttctgcgc gtaatctgct gcttgcaaac
+     1081 aaaaaaacca ccgctaccag cggtggtttg tttgccggat caagagctac caactctttt
+     1141 tccgaaggta actggcttca gcagagcgca gataccaaat actgttcttc tagtgtagcc
+     1201 gtagttaggc caccacttca agaactctgt agcaccgcct acatacctcg ctctgctaat
+     1261 cctgttacca gtggctgctg ccagtggcga taagtcgtgt cttaccgggt tggactcaag
+     1321 acgatagtta ccggataagg cgcagcggtc gggctgaacg gggggttcgt gcacacagcc
+     1381 cagcttggag cgaacgacct acaccgaact gagataccta cagcgtgagc tatgagaaag
+     1441 cgccacgctt cccgaaggga gaaaggcgga caggtatccg gtaagcggca gggtcggaac
+     1501 aggagagcgc acgagggagc ttccaggggg aaacgcctgg tatctttata gtcctgtcgg
+     1561 gtttcgccac ctctgacttg agcgtcgatt tttgtgatgc tcgtcagggg ggcggagcct
+     1621 atggaaaaac gccagcaacg cggccttttt acggttcctg gccttttgct ggccttttgc
+     1681 tcacatgttc tttcctgcgt tatcccctga ttctgtggat aaccgtag
+//
