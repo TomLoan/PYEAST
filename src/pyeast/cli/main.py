@@ -878,7 +878,7 @@ def run_gg_lvl1_interactive_mode(designer: gg_lvl1Designer):
                 if click.confirm("Save Outputs?"): 
                     
                     designer.gg_save_output(output_path)
-
+                    designer.gg_instructions(output_path, prefix)
                 #exit loop on successful assembly    
                 break
 

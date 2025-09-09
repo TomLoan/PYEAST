@@ -44,6 +44,8 @@ from prompt_toolkit.shortcuts import confirm
 import io
 from PIL import Image
 import dnacauldron as dc
+import pandas as pd
+import openpyxl
 
 from ..utils.sequence_utils import (
     load_sequences,
@@ -83,7 +85,8 @@ class gg_lvl1Designer:
     
 
     def __init__(self, 
-                 gg_plasmids: Path = Path('data/gg plasmids/Yeast MoClo lvl 0')
+                 gg_plasmids: Path = Path('data/gg plasmids/Yeast MoClo lvl 0'),
+                 template_folder: Path = Path("data/templates")
                  ): 
         """Inintialise a new gg_lvl1 designer. 
         
@@ -92,10 +95,11 @@ class gg_lvl1Designer:
             """
         # File paths 
         self.gg_plasmids = gg_plasmids
+        self.template_folder = template_folder
         
         # state storage
         self.console = Console()
-        self.session = PromptSession()
+        self.session = PromptSession() 
         self.multiplex = False
         self.available_sequences = {}     # All loaded sequences
         self.assembly_sequences = []      # Sequences in assembly order may be multiple assemblies for multiplex work (list of lists)
@@ -268,42 +272,9 @@ class gg_lvl1Designer:
             except KeyboardInterrupt:
                 if confirm("\nDo you want to exit?"):
                     raise click.Abort()
-                continue
-    
+                continue  
 
 
-    # def get_seq_records(self): 
-    #     """"converts self.assembly_sequences to a list of SeqRecord lists with matching names
-        
-    #     Converts the list of assembly names lists into SeqRecord objects from self.available_seqeunces
-    #     Returns a list of lists of SeqRecords for both single and multiplex assemblies
-
-    #     Returns: 
-    #         List[List[SeqRecord]]: List of assemblies, each of which are lists of Seqrecord objects
-    #                 Single assembly: [[Seq1, Seq2, ..]]
-    #                 Multiplex assembly : [[Seq1, Seq2, ..][Seq1, Seq2a, ...]...]
-        
-    #     Raises: 
-    #         ValueError: if no sequences have been seelcted for assembly
-    #         KeyError: if any sequence name in assemblies is not found in available sequences
-    #     """
-    #     if not hasattr(self, 'assemblies') or not self.assemblies_names:
-    #         raise ValueError("No assemblies selected. Please run get_assembly_order first.")
-        
-    #     if not self.available_sequences:
-    #         raise ValueError("No sequences available. Please load sequences first.")
-        
-    #     #get the SeqRecords from the names and populate a list
-    #     for assembly in self.assemblies_names: 
-    #         seq_records = [] 
-    #         for seq_name in assembly: 
-    #             if seq_name not in self.available_sequences: 
-    #                 raise KeyError(f"Sequence {seq_name} not found in availble sequences")
-    #             seq_records.append(self.available_sequences[seq_name])
-    #         self.assembly_sequences.append(seq_records)
-        
-    #     return self.assembly_sequences 
-    
     def get_plasmid_names(self) -> List[str]:  
         """this will map the sequences in self.assembly_sequences onto plasmids containing those sequences
         in the speficied directory, sets self.plasmid_names = list[str] doe dnacauldron 
@@ -458,7 +429,7 @@ class gg_lvl1Designer:
         elif actual_constructs == expected_constructs: 
             self.console.print(f"generated {expected_constructs} constructs as expected using [blue]{assembly.enzyme}[/blue]")
 
-    def gg_save_output(self, output_prefix: str) -> None: 
+    def gg_save_output(self, output_path: str) -> None: 
         """Saves the output of the assembly function, creating a new plasmid output file
         single assemblies, or a folder full of .gb files (no images) for multiplex assemblies. 
         Takes output from simulation object to write a full report. also uses the user input 
@@ -473,11 +444,11 @@ class gg_lvl1Designer:
         """
         reporter = dc.AssemblyReportWriter(include_part_records=False
                                            )
-        self.assembly_sim.write_report(output_prefix, report_writer=reporter)
+        self.assembly_sim.write_report(output_path, report_writer=reporter)
         
         
 
-    def gg_instructions(self): 
+    def gg_instructions(self, output_path: str, assembly_name: str): 
         """Generates human readable and [optionally] machine specific instructions 
         this will just boil down to a table of what plasmids to include and where they are
         I will save this in the appropriate folder - but I'd like to make it possible to 
@@ -485,7 +456,102 @@ class gg_lvl1Designer:
         to be assembled - e.g. if you realize you want to use a different machine.
         this might actaully be clearer as a separate command simlar to batch.
         """
-        pass
+        all_construct_data = self.assembly_sim.compute_all_construct_data_dicts()
+        for i, dict in enumerate(all_construct_data): 
+            # generate destination well, starts at A1 and fill horozontally (A1, A2, A3... etc )
+            row_letter = chr(65 + ((i) // 12))  # A, B, C, etc.
+            col_number = ((i) % 12) + 1        # 1, 2, 3, etc.
+            dict["destination_well"] = f"{row_letter}{col_number}"
+            parts = dict["parts"]
+            wells = []
+            for part in parts: 
+                loc = self._get_template_position(part)
+                wells.append(loc)
+            dict["wells"] = wells
+
+        # Construct a big long list of instructions for a liquid handling robot for now (beta) this is specific to a janus robot. I'll we configure latter to support 
+        # different instruments. 
+        all_info_dataframe = pd.DataFrame(all_construct_data)
+        instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
+        instructions_dataframe[['asperate_plate', 'asperate_well']] = pd.DataFrame(instructions_dataframe['wells'].to_list())
+        instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
+        instructions_dataframe = instructions_dataframe.sort_values(by = ['asperate_plate','asperate_well'])
+        liquid_handling_instructions = instructions_dataframe[['construct_id', 'asperate_plate', 'asperate_well', 'destination_well']].copy()
+        liquid_handling_instructions['transfer_volume'] = 1
+        liquid_handling_instructions['destination_plate'] = 'assembly plate'
+        liquid_handling_instructions['new_tip'] = (
+            liquid_handling_instructions['asperate_well'] != liquid_handling_instructions['asperate_well'].shift()).map({True:'T', False: 'F'})
+        liquid_handling_instructions['drop_tip'] = (
+            liquid_handling_instructions['asperate_well'] != liquid_handling_instructions['asperate_well'].shift(-1)).map({True:'T', False: 'F'})
+        liquid_handling_instructions.loc[0, 'new_tip'] = 'T'
+        liquid_handling_instructions.loc[len(liquid_handling_instructions)-1, 'drop_tip'] = 'T'
+        
+
+        #save output - I need to go back and change these to class variables when I add support for addition of other robots
+        liquid_handling_instructions.to_csv(f"{output_path}/{assembly_name}_worklist.csv", index = False)
+        self.console.print(f"Saved output to {output_path}/{assembly_name}_worklist.csv")
+        #self.console.print(liquid_handling_instructions)
+        
+                                 
+
+    def _get_template_position(self, template_name: str) -> Tuple[Optional[str], Optional[str]]:
+        """Find the plate and well position for a given template.
+        
+        First checks if the template is a contig/chromosome in the genome mapping file,
+        then checks the template plates Excel file for individual templates.
+        
+        Args:
+            template_name: Name of the template or genome contig to locate
+            
+        Returns:
+            Tuple containing:
+                - Plate name/barcode (or None if not found)
+                - Well position (or None if not found)
+                Format of well position is standard 96-well notation (e.g., 'A1', 'H12')
+                
+        Raises:
+            FileNotFoundError: If required mapping files aren't found
+        """
+        # First check genome mapping file for contigs
+        genome_map_file = self.template_folder / 'genome_well_mapping.tsv'
+        if genome_map_file.exists():
+            try:
+                genome_df = pd.read_csv(genome_map_file, sep='\t')
+                
+                # Search through each row's contig list
+                for _, row in genome_df.iterrows():
+                    contigs = [c.strip() for c in row['Contig_Names'].split(',')]
+                    if template_name in contigs:
+                        return row['Plate'], row['Well_Position']
+                        
+            except Exception as e:
+                self.console.print(f"[yellow]Warning: Error reading genome mapping file: {str(e)}[/yellow]")
+        
+        # If not found in genome mapping, check template plates Excel file
+        template_excel = self.template_folder / 'TemPlates.xlsx'
+        if not template_excel.exists():
+            raise FileNotFoundError(f"Template plate map not found: {template_excel}")
+            
+        try:
+            wb = openpyxl.load_workbook(template_excel)
+            
+            # Search each sheet (plate)
+            for sheet in wb.sheetnames:
+                ws = wb[sheet]
+                for row in range(3, 11):  # Rows 3-10 map to A-H
+                    for col in range(2, 14):  # Columns 2-13 map to 1-12
+                        cell_value = ws.cell(row=row, column=col).value
+                        if cell_value == template_name:
+                            # Convert Excel row/col to plate coordinates
+                            well = f"{chr(row-3+65)}{col-1}"  # Convert 3->A, 4->B, etc.
+                            return sheet, well
+                            
+        except Exception as e:
+            self.console.print(f"[yellow]Warning: Error reading template plate map: {str(e)}[/yellow]")
+        
+        # Template not found in either location
+        self.console.print(f"[yellow]Warning: Template {template_name} not found in any mapping files[/yellow]")
+        return None, None
 
 
     def find_templates(self, template_folder: Path) -> None:
