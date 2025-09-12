@@ -334,12 +334,12 @@ class gg_lvl1Designer:
             except Exception as e: 
                 self.console.print(f"[yellow]Warning could not read {plasmid_file}: {str(e)}[/yellow]")
                 continue 
-
+        
         # check for missing mappings
         missing_parts = all_part_names - set(part_to_plasmid.keys())
 
         if missing_parts: 
-            self.console.print(f"[red]Could not find plasmid containsin {', '.join(missing_parts)}[/red]")
+            self.console.print(f"[red]Could not find plasmid containing {', '.join(missing_parts)}[/red]")
             raise RuntimeError(f"Parts not found in any plasmids: {missing_parts}")
         
         # Get unique plasmid names for assembly
@@ -385,7 +385,8 @@ class gg_lvl1Designer:
         #Create repository from all available lvl 0 plasmids 
         repository = dc.SequenceRepository()
         repository.import_records(
-            folder = str(self.gg_plasmids)
+            folder = str(self.gg_plasmids), 
+            use_file_names_as_ids=False
         )
         self.repository = repository 
         
@@ -470,21 +471,24 @@ class gg_lvl1Designer:
             dict["wells"] = wells
 
         # Construct a big long list of instructions for a liquid handling robot for now (beta) this is specific to a janus robot. I'll we configure latter to support 
-        # different instruments. 
+        # different instruments and to select wheat instrument you want to use. 
         all_info_dataframe = pd.DataFrame(all_construct_data)
         instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
         instructions_dataframe[['asperate_plate', 'asperate_well']] = pd.DataFrame(instructions_dataframe['wells'].to_list())
         instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
-        instructions_dataframe = instructions_dataframe.sort_values(by = ['asperate_plate','asperate_well'])
+        
         liquid_handling_instructions = instructions_dataframe[['construct_id', 'asperate_plate', 'asperate_well', 'destination_well']].copy()
         liquid_handling_instructions['transfer_volume'] = 1
         liquid_handling_instructions['destination_plate'] = 'assembly plate'
-        liquid_handling_instructions['new_tip'] = (
-            liquid_handling_instructions['asperate_well'] != liquid_handling_instructions['asperate_well'].shift()).map({True:'T', False: 'F'})
-        liquid_handling_instructions['drop_tip'] = (
-            liquid_handling_instructions['asperate_well'] != liquid_handling_instructions['asperate_well'].shift(-1)).map({True:'T', False: 'F'})
-        liquid_handling_instructions.loc[0, 'new_tip'] = 'T'
-        liquid_handling_instructions.loc[len(liquid_handling_instructions)-1, 'drop_tip'] = 'T'
+
+        # For single head machines you can use these parameters to save tips. Different implementation required for multi
+        # instructions_dataframe = instructions_dataframe.sort_values(by = ['asperate_plate','asperate_well'])
+        # liquid_handling_instructions['new_tip'] = (
+        #     liquid_handling_instructions['asperate_well'] != liquid_handling_instructions['asperate_well'].shift()).map({True:'T', False: 'F'})
+        # liquid_handling_instructions['drop_tip'] = (
+        #     liquid_handling_instructions['asperate_well'] != liquid_handling_instructions['asperate_well'].shift(-1)).map({True:'T', False: 'F'})
+        # liquid_handling_instructions.loc[0, 'new_tip'] = 'T'
+        # liquid_handling_instructions.loc[len(liquid_handling_instructions)-1, 'drop_tip'] = 'T'
         
 
         #save output - I need to go back and change these to class variables when I add support for addition of other robots

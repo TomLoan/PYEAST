@@ -894,9 +894,6 @@ def run_gg_lvl1_interactive_mode(designer: gg_lvl1Designer):
 
     except click.Abort:
         console.print("\n[yellow]Operation cancelled[/yellow]")
-    # except Exception as e:
-    #     console.print(f"[bold red]Error:[/bold red] {str(e)}")
-    #     return
     
 @click.group()
 def cli():
