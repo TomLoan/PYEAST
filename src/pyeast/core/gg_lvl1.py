@@ -46,6 +46,7 @@ from PIL import Image
 import dnacauldron as dc
 import pandas as pd
 import openpyxl
+import csv
 
 from ..utils.sequence_utils import (
     load_sequences,
@@ -86,21 +87,25 @@ class gg_lvl1Designer:
 
     def __init__(self, 
                  gg_plasmids: Path = Path('data/gg plasmids/Yeast MoClo lvl 0'),
-                 template_folder: Path = Path("data/templates")
+                 template_folder: Path = Path("data/templates"), 
+                 instruments: List = ['Janus', 'epMotion', 'Human'], 
+                 is_library: bool = False
                  ): 
         """Inintialise a new gg_lvl1 designer. 
         
         Args:
             gg_plasmids: Path to directory containing level 0 plasmid files (default: 'data/gg plasmids/Yeast MoClo lvl 0')
             """
-        # File paths 
-        self.gg_plasmids = gg_plasmids
+        # File paths                     # These need to be user determined. 
+        self.gg_plasmids = gg_plasmids   
         self.template_folder = template_folder
         
         # state storage
+        self.instruments = instruments
         self.console = Console()
         self.session = PromptSession() 
         self.multiplex = False
+        self.is_library = is_library
         self.available_sequences = {}     # All loaded sequences
         self.assembly_sequences = []      # Sequences in assembly order may be multiple assemblies for multiplex work (list of lists)
         self.assemblies_names = None      # Part names stored as strings
@@ -459,9 +464,13 @@ class gg_lvl1Designer:
         """
         all_construct_data = self.assembly_sim.compute_all_construct_data_dicts()
         for i, dict in enumerate(all_construct_data): 
-            # generate destination well, starts at A1 and fill horozontally (A1, A2, A3... etc )
-            row_letter = chr(65 + ((i) // 12))  # A, B, C, etc.
-            col_number = ((i) % 12) + 1        # 1, 2, 3, etc.
+            # generate destination well, starts at A1 and fill horozontally (A1, A2, A3... etc ), for a library everything goes into one well
+            if self.is_library: 
+                row_letter = 'A'
+                col_number = '1'
+            else: 
+                row_letter = chr(65 + ((i) // 12))  # A, B, C, etc.
+                col_number = ((i) % 12) + 1        # 1, 2, 3, etc.
             dict["destination_well"] = f"{row_letter}{col_number}"
             parts = dict["parts"]
             wells = []
@@ -470,33 +479,82 @@ class gg_lvl1Designer:
                 wells.append(loc)
             dict["wells"] = wells
 
-        # Construct a big long list of instructions for a liquid handling robot for now (beta) this is specific to a janus robot. I'll we configure latter to support 
-        # different instruments and to select wheat instrument you want to use. 
+        # Generate a dataframe with all the relavent information
         all_info_dataframe = pd.DataFrame(all_construct_data)
+        
         instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
-        instructions_dataframe[['asperate_plate', 'asperate_well']] = pd.DataFrame(instructions_dataframe['wells'].to_list())
-        instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
         
-        liquid_handling_instructions = instructions_dataframe[['construct_id', 'asperate_plate', 'asperate_well', 'destination_well']].copy()
-        liquid_handling_instructions['transfer_volume'] = 1
-        liquid_handling_instructions['destination_plate'] = 'assembly plate'
-
-        # For single head machines you can use these parameters to save tips. Different implementation required for multi
-        # instructions_dataframe = instructions_dataframe.sort_values(by = ['asperate_plate','asperate_well'])
-        # liquid_handling_instructions['new_tip'] = (
-        #     liquid_handling_instructions['asperate_well'] != liquid_handling_instructions['asperate_well'].shift()).map({True:'T', False: 'F'})
-        # liquid_handling_instructions['drop_tip'] = (
-        #     liquid_handling_instructions['asperate_well'] != liquid_handling_instructions['asperate_well'].shift(-1)).map({True:'T', False: 'F'})
-        # liquid_handling_instructions.loc[0, 'new_tip'] = 'T'
-        # liquid_handling_instructions.loc[len(liquid_handling_instructions)-1, 'drop_tip'] = 'T'
+        if self.is_library: 
+            instructions_dataframe = instructions_dataframe.drop_duplicates(subset=["wells"]).reset_index(drop=True)
         
 
-        #save output - I need to go back and change these to class variables when I add support for addition of other robots
-        liquid_handling_instructions.to_csv(f"{output_path}/{assembly_name}_worklist.csv", index = False)
-        self.console.print(f"Saved output to {output_path}/{assembly_name}_worklist.csv")
-        #self.console.print(liquid_handling_instructions)
-        
-                                 
+        # User selects liquid handler and coresponding instructions are written
+        self.console.print("Available liquid handlers")
+        for i, instrument in enumerate(self.instruments): 
+            self.console.print(f"{i}: {instrument}")
+   
+        completer = WordCompleter(self.instruments, ignore_case=True)
+        liquid_handler = self.session.prompt(f"Selected liquid handler for instruction formating:", completer=completer).strip().lower()
+
+        if liquid_handler == "janus": 
+            # instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
+            instructions_dataframe[['asperate_plate', 'asperate_well']] = pd.DataFrame(instructions_dataframe['wells'].to_list())
+            instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
+            janus_instructions = instructions_dataframe[['construct_id', 'asperate_plate', 'asperate_well', 'destination_well']].copy()
+            janus_instructions['transfer_volume'] = 1
+            janus_instructions['destination_plate'] = 'assembly plate' # need in increment this up by one ever 96 assemblies (will this ever happen? It's so much material!)
+            janus_instructions.to_csv(f"{output_path}/{assembly_name}_worklist.csv", index = False)
+            self.console.print(f"Saved output to {output_path}/{assembly_name}_worklist.csv")
+
+            # For single head machines you can use these parameters to save tips. Different, v. complex implementation required for multi see CRVP paper by Wu et al 2025
+            # instructions_dataframe = instructions_dataframe.sort_values(by = ['asperate_plate','asperate_well'])
+            # janus_instructions['new_tip'] = (
+            #     janus_instructions['asperate_well'] != janus_instructions['asperate_well'].shift()).map({True:'T', False: 'F'})
+            # janus_instructions['drop_tip'] = (
+            #     janus_instructions['asperate_well'] != janus_instructions['asperate_well'].shift(-1)).map({True:'T', False: 'F'})
+            # janus_instructions.loc[0, 'new_tip'] = 'T'
+            # janus_instructions.loc[len(janus_instructions)-1, 'drop_tip'] = 'T'
+
+        elif liquid_handler == 'epmotion':
+            
+            header = [
+                ['Labware', 'Src.Barcode', 'Src.List Name', 'Dest.Barcode', 'Dest.List name', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
+            ]
+            # instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
+            instructions_dataframe[['Barcode ID', 'Source']] = pd.DataFrame(instructions_dataframe['wells'].to_list())
+            instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
+            # Map unique barcodes to sequential ID numbers 
+            unique_barcodes = instructions_dataframe['Barcode ID'].unique()
+            barcode_to_labware = {barcode: i+1 for i, barcode in enumerate(unique_barcodes)}
+            instructions_dataframe['Source_Labware'] = instructions_dataframe['Barcode ID'].map(barcode_to_labware)
+            instructions_dataframe['Destination_labware'] = 1 # Supports a max of one assembly plate for now. 
+            instructions_dataframe['Tool'] = 'TS_50'# single channel only for cherry picking
+            instructions_dataframe['Volume'] = 1
+            instructions_dataframe['Name'] = ''
+            epmotion_instructions = instructions_dataframe[['Barcode ID',
+                                                            'Source_Labware',
+                                                            'Source',
+                                                            'Destination_labware',
+                                                            'destination_well',
+                                                            'Volume',
+                                                            'Tool',
+                                                            'Name'
+                                                            ]]
+            # Sae output Note I need the csv wirter here - concatenating the header and df produces a misalignment. 
+            with open(f"{output_path}/{assembly_name}_epmotion_instructions.csv", 'w', newline='') as f: 
+                writer = csv.writer(f)
+                writer.writerows(header)
+                writer.writerows(epmotion_instructions.values)
+            self.console.print(f"Saved epMotion instructions to {output_path} as {assembly_name}_epmotion_instructions.csv")
+            
+        elif liquid_handler == 'human': 
+            pass                                 
 
     def _get_template_position(self, template_name: str) -> Tuple[Optional[str], Optional[str]]:
         """Find the plate and well position for a given template.

@@ -1105,12 +1105,20 @@ def batch(reuse_limit):
         raise click.Abort()
 
 @cli.command()
-def ggytk1():
+@click.option('--library', 
+              type = bool, 
+              default = False, 
+              help = 'Assemble selections in a single reaction to create a library of constructs (default: False)')
+def gglvl1(library):
     """Design golden gate cloning experiments in Saccharomyces cerevisiae
     \b\n
+    Supports multiplex and library type assemblies
+    Use / to seperate component names you want to multiplex with, or input /allX to select all components of type X
+    The designer can handle parts input out of order, although this can make it hard to see what you're doing and will 
+    idenify the correct enzyme for the parts you've selected automatically. 
     """
     try:
-        designer = gg_lvl1Designer()
+        designer = gg_lvl1Designer(is_library = library)
         run_gg_lvl1_interactive_mode(designer)
     except click.Abort:
         raise
