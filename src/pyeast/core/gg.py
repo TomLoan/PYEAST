@@ -343,15 +343,15 @@ class ggDesigner:
         # Show mapping summary
         self.console.print(f"[green]Successfully mapped {len(all_part_names)} parts to {len(required_plasmids)} plasmids[/green]")
         
-        # Show detailed mapping
-        table = Table(title="Part to Plasmid Mapping")
-        table.add_column("Part Name", style="cyan")
-        table.add_column("Plasmid Name", style="yellow")
+        # # Show detailed mapping
+        # table = Table(title="Part to Plasmid Mapping")
+        # table.add_column("Part Name", style="cyan")
+        # table.add_column("Plasmid Name", style="yellow")
         
-        for part_name in sorted(all_part_names):
-            table.add_row(part_name, part_to_plasmid[part_name])
+        # for part_name in sorted(all_part_names):
+        #     table.add_row(part_name, part_to_plasmid[part_name])
         
-        self.console.print(table)
+        # self.console.print(table)
         
         return self.plasmid_names
         
