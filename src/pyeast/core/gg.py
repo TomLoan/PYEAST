@@ -56,37 +56,13 @@ from ..utils.sequence_utils import (
 from ..utils.visualisation import visualise_genbank, save_figure
 
 
-class gg_lvl1Designer: 
-    """A class for designing golden gate level 1 assemblies. 
+class ggDesigner: 
+    """A class for designing golden gate assemblies. 
     
-    This class handles the design assemblies according to the 
-    parameters in the yeast MoClo took kit laid out in Lee et al
-    2015
+    This class handles the design assemblies. Uses the DNAcauldron package from the Edinborough bifoundry.
     """
-    #Flanking sequences specific to different part types, should specifiy part type as a string
-    #'3a', '2', etc. and sequences as tuple of strings e.g. '1': ('5'seq', '3'seq')
-    FLANKING_SEQs = {
-        "1": ('CCCT','TTGC'),
-        "2": ('AACG','ATAC'),
-        "3": ('TATG', 'TAGG'),
-        "3a": ('TATG', 'AAGA'),
-        "3a'": ('TATG','TGCT'),
-        "3b": ('TTCT', 'TAGG'),
-        "3b'":('ACGA', 'TAGG'), 
-        "4": ('ATCC', 'CGAC'),
-        "4a": ('ATCC', 'ACCG'),
-        "4b": ('TGGC', 'CGAC'), 
-        "5": ('GCTG', 'ATGT'),
-        "6": ('TACA', 'CTCA'),
-        "7": ('GAGT', 'GGCT'), 
-        "8": ('CCGA', 'GGGA'),
-        "8a": ('CCGA', 'GTTA'), 
-        "8b": ('CAAT', 'GGGA'), 
-        }
-    
 
-    def __init__(self, 
-                 gg_plasmids: Path = Path('data/gg plasmids/Yeast MoClo lvl 0'),
+    def __init__(self,
                  template_folder: Path = Path("data/templates"), 
                  instruments: List = ['Janus', 'epMotion', 'Human'], 
                  is_library: bool = False
@@ -94,10 +70,19 @@ class gg_lvl1Designer:
         """Inintialise a new gg_lvl1 designer. 
         
         Args:
-            gg_plasmids: Path to directory containing level 0 plasmid files (default: 'data/gg plasmids/Yeast MoClo lvl 0')
+            template_folder: 
+                Path to a fold where the file catalogging plasmid positions in 96 well plates,
+                 TemPlates.xlsx, is stored. Defaults to data/templates.
+            
+            Instruments: 
+                List of available instruments, each requires implementation so shouldn't be input by the user.
+            
+            is_library: 
+                Bool that flags if the assembly is to be multiplexed in separate wells, or pooled to create a library.
+                Defauls to False to return separate assemblies. 
             """
         # File paths                     # These need to be user determined. 
-        self.gg_plasmids = gg_plasmids   
+        self.gg_plasmids = None   
         self.template_folder = template_folder
         
         # state storage
@@ -124,6 +109,7 @@ class gg_lvl1Designer:
             as fasta files
             """
         self.available_sequences = load_sequences(directory)
+        self.gg_plasmids = Path(f"{directory}/plasmids")
         return self.available_sequences
     
     def print_sequence_grid(self, sequences: dict, title: str = "Available Sequences"):
@@ -357,15 +343,15 @@ class gg_lvl1Designer:
         # Show mapping summary
         self.console.print(f"[green]Successfully mapped {len(all_part_names)} parts to {len(required_plasmids)} plasmids[/green]")
         
-        # # Show detailed mapping
-        # table = Table(title="Part to Plasmid Mapping")
-        # table.add_column("Part Name", style="cyan")
-        # table.add_column("Plasmid Name", style="yellow")
+        # Show detailed mapping
+        table = Table(title="Part to Plasmid Mapping")
+        table.add_column("Part Name", style="cyan")
+        table.add_column("Plasmid Name", style="yellow")
         
-        # for part_name in sorted(all_part_names):
-        #     table.add_row(part_name, part_to_plasmid[part_name])
+        for part_name in sorted(all_part_names):
+            table.add_row(part_name, part_to_plasmid[part_name])
         
-        # self.console.print(table)
+        self.console.print(table)
         
         return self.plasmid_names
         
@@ -491,10 +477,10 @@ class gg_lvl1Designer:
         # User selects liquid handler and coresponding instructions are written
         self.console.print("Available liquid handlers")
         for i, instrument in enumerate(self.instruments): 
-            self.console.print(f"{i}: {instrument}")
+            self.console.print(f"{i+1}: {instrument}")
    
         completer = WordCompleter(self.instruments, ignore_case=True)
-        liquid_handler = self.session.prompt(f"Selected liquid handler for instruction formating:", completer=completer).strip().lower()
+        liquid_handler = self.session.prompt(f"Select a liquid handler for instruction formating: ", completer=completer).strip().lower()
 
         if liquid_handler == "janus": 
             # instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)

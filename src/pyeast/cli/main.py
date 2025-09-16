@@ -43,7 +43,7 @@ from ..core.integration import IntegrationDesigner
 from ..core.deletion import DeletionDesigner
 from ..core.replace import ReplaceDesigner
 from ..core.batch import BatchDesigner
-from ..core.gg_lvl1 import gg_lvl1Designer
+from ..core.gg import ggDesigner
 
 from .. utils.visualisation import visualise_genbank, save_figure
 
@@ -822,7 +822,7 @@ def run_batch_interactive_mode(designer: BatchDesigner):
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise click.Abort()
     
-def run_gg_lvl1_interactive_mode(designer: gg_lvl1Designer):
+def run_gg_interactive_mode(designer: ggDesigner):
     """Run TAR design in interactive mode"""
     try:
         # Get components directory
@@ -1109,7 +1109,7 @@ def batch(reuse_limit):
               type = bool, 
               default = False, 
               help = 'Assemble selections in a single reaction to create a library of constructs (default: False)')
-def gglvl1(library):
+def gg(library):
     """Design golden gate cloning experiments in Saccharomyces cerevisiae
     \b\n
     Supports multiplex and library type assemblies
@@ -1118,8 +1118,8 @@ def gglvl1(library):
     idenify the correct enzyme for the parts you've selected automatically. 
     """
     try:
-        designer = gg_lvl1Designer(is_library = library)
-        run_gg_lvl1_interactive_mode(designer)
+        designer = ggDesigner(is_library = library)
+        run_gg_interactive_mode(designer)
     except click.Abort:
         raise
     except Exception as e:
