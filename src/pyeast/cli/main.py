@@ -43,6 +43,7 @@ from ..core.integration import IntegrationDesigner
 from ..core.deletion import DeletionDesigner
 from ..core.replace import ReplaceDesigner
 from ..core.batch import BatchDesigner
+from ..core.gg import ggDesigner
 
 from .. utils.visualisation import visualise_genbank, save_figure
 
@@ -50,7 +51,8 @@ console = Console()
 
 
 def get_output_prefix() -> str:
-    """Get output prefix from user - just the name, not path"""
+    """Get output prefix from user - just the name not path, 
+    make sure it'll be a vaild file name and  and return the full path"""
     session = PromptSession()
     output_dir = Path("output")
     
@@ -82,7 +84,8 @@ def get_output_prefix() -> str:
                 output_dir / f"{safe_name}_missing_primers.tsv",
                 output_dir / f"{safe_name}_all_primers.tsv",
                 output_dir / f"{safe_name}_screening_primers.tsv",
-                output_dir / f"{safe_name}.fasta"
+                output_dir / f"{safe_name}.fasta",
+                output_dir / safe_name
             ]
             
             existing = [f for f in potential_files if f.exists()]
@@ -90,7 +93,7 @@ def get_output_prefix() -> str:
                 console.print("[yellow]Warning: The following files already exist:[/yellow]")
                 for f in existing:
                     console.print(f"  - {f.name}")
-                if not click.confirm("Overwrite these files?"):
+                if not click.confirm("Risk overwriting these files?"):
                     continue
             
             return str(output_dir / safe_name)
@@ -99,30 +102,54 @@ def get_output_prefix() -> str:
             if click.confirm("\nCancel output name selection?"):
                 raise click.Abort()
 
-def handle_machine_instructions(designer: BatchDesigner, timestamp: str) -> None:
+def handle_machine_instructions(designer: BatchDesigner) -> None:
     """Ask user if they want to generate machine instructions and handle the response.
     
     Args:
         designer: BatchDesigner instance with completed assembly instructions
-        timestamp: Current timestamp for file naming
     """
+    session = PromptSession() 
+
     if click.confirm("\nWould you like to generate machine instructions for liquid handling?"):
-        # For now we only have epMotion, but structure allows easy expansion
-        machines = ['epMotion']
+        # Select from available machines
+        machines = ['epMotion', 'Janus']
         
         print("\nAvailable liquid handling machines:")
         for i, machine in enumerate(machines, 1):
             print(f"{i}. {machine}")
-            
-        if len(machines) == 1:
-            print("\nCurrently only epMotion is supported.")
+
+        completer = WordCompleter(machines, ignore_case=True)
+
+        selection = session.prompt("Which machine would you like to use? \n", completer = completer).strip().lower()
+
+        if selection == "epmotion":
             if click.confirm("Generate epMotion instructions?"):
                 try:
-                    output_file = designer.generate_epmotion_instructions(timestamp)
-                    print(f"\nMachine instructions saved to: {output_file}")
+                    timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
+                    #write instructions for the PCR set up
+                    designer.generate_epmotion_instructions(timestamp)
+                    #output_file = designer.generate_epmotion_instructions(timestamp)
+                    #write instructions for the assembly transforations
+                    designer.generate_machine_assembly_instructions('epmotion', timestamp)
+                    #print(f"\nMachine instructions saved to: {output_file}")
                 except Exception as e:
                     print(f"\nError generating machine instructions: {str(e)}")
 
+        if selection == "janus":
+            if click.confirm("Generate Janus instructions?"):
+                try:
+                    timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
+                    #write instructions for the PCR set up
+                    designer.generate_janus_instructions(timestamp)
+                    #output_file = designer.generate_janus_instructions(timestamp)
+                    #write instructions for the assembly transforations
+                    designer.generate_machine_assembly_instructions('janus', timestamp)
+                    #print(f"\nMachine instructions saved to: {output_file}")
+                except Exception as e:
+                    print(f"\nError generating machine instructions: {str(e)}")
+           
+    else: 
+        pass
 
 def get_component_dir() -> Path:
     """Get component directory with simple autocompletion"""
@@ -130,12 +157,18 @@ def get_component_dir() -> Path:
     base_dir = Path("data/component libraries")
     console.print(base_dir)
     
+    #todo add a private data option
+    # #check for private data and include in the options
+    # private_components = Path("data/private/component libraries")
+    # if private_components.exists(): 
+    #     console.print(private_components)
+
     if not base_dir.exists():
         console.print("[red]Error: Default components directory not found[/red]")
         raise click.Abort()
         
     # Create completer from subdirectories
-    subdirs = [d.name for d in base_dir.iterdir() if d.is_dir()]
+    subdirs = [d.name for d in base_dir.iterdir() if d.is_dir()] #+ [d.name for d in private_components.iterdir() if d.is_dir()]
     dir_completer = WordCompleter(subdirs, ignore_case=True)
     
     session = PromptSession()
@@ -154,7 +187,7 @@ def get_component_dir() -> Path:
                 completer=dir_completer
             )
             
-            selected_dir = base_dir / user_input
+            selected_dir = base_dir / user_input 
             if selected_dir.exists() and selected_dir.is_dir():
                 return selected_dir
             else:
@@ -217,7 +250,7 @@ def run_tar_interactive_mode(designer: TARDesigner):
         # Display instructions and confirm
         designer.display_instructions(instructions)
         
-        if not click.confirm("\nProceed with assembly?"):
+        if not click.confirm("\nProceed with assembly?"):       
             console.print("[yellow]Design cancelled[/yellow]")
             return
         
@@ -514,8 +547,8 @@ def run_deletion_interactive_mode(designer: DeletionDesigner):
             # Save primers
             forward_primer, reverse_primer = designer.screening_primers
             with open(f"{output_prefix}_screening_primers.tsv", 'w') as f:
-                f.write(f"{output_prefix}_ScreenF\t{forward_primer}\n")
-                f.write(f"{output_prefix}_ScreenR\t{reverse_primer}")
+                f.write(f"{output_prefix.split("\\")[1]}_ScreenF\t{forward_primer}\n")
+                f.write(f"{output_prefix.split("\\")[1]}_ScreenR\t{reverse_primer}")
                 
             # Generate and save map
             img_data, fig = visualise_genbank(f"{output_prefix}.gb")
@@ -656,8 +689,8 @@ def run_replace_interactive_mode(designer: ReplaceDesigner):
             # Save primers
             forward_primer, reverse_primer = designer.screening_primers
             with open(f"{output_prefix}_screening_primers.tsv", 'w') as f:
-                f.write(f"{output_prefix}_ScreenF\t{forward_primer}\n")
-                f.write(f"{output_prefix}_ScreenR\t{reverse_primer}")
+                f.write(f"{output_prefix.split("\\")[1]}_ScreenF\t{forward_primer}\n")
+                f.write(f"{output_prefix.split("\\")[1]}_ScreenR\t{reverse_primer}")
                 
             # Generate and save map
             img_data, fig = visualise_genbank(f"{output_prefix}.gb")
@@ -769,17 +802,11 @@ def run_batch_interactive_mode(designer: BatchDesigner):
             progress.update(task_id, completed=True)
 
         # Optionally generate machine instructions
-        if click.confirm("\nGenerate machine instructions for epMotion?"):
-            task_id = progress.add_task("Generating machine instructions...", total=None)
-            try:
-                timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
-                designer.generate_epmotion_instructions(timestamp)
-                designer.generate_machine_assembly_instructions('epmotion', timestamp)
-            except ValueError as e:
-                progress.update(task_id, completed=True)
-                console.print(f"\n[red]{str(e)}[/red]")
-                return
-            progress.update(task_id, completed=True)
+        progress.update(task_id, completed=True)
+           
+        handle_machine_instructions(designer) 
+           
+        progress.update(task_id, completed=True)
 
         console.print("\n[bold green]✓[/bold green] Batch design complete!")
         
@@ -794,6 +821,79 @@ def run_batch_interactive_mode(designer: BatchDesigner):
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise click.Abort()
+    
+def run_gg_interactive_mode(designer: ggDesigner):
+    """Run TAR design in interactive mode"""
+    try:
+        # Get components directory
+        components_dir = get_component_dir()
+        
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
+            # Load and process sequences
+            task_id = progress.add_task("Loading sequences...", total=None)
+            sequences = designer.load_and_get_sequences(components_dir)
+            progress.update(task_id, completed=True)
+            
+            if not sequences:
+                console.print("[red]No sequences found in directory[/red]")
+                return
+        # Main workflow loop - returns suer to selection on failure
+        while True:
+             
+            try: 
+                # Display sequences and get assembly order
+                designer.print_sequence_grid(sequences)
+                assembly_order = designer.get_assembly_order(sequences)
+                
+                if not assembly_order: 
+                    console.print("[yellow]No assembly selected[{]/yellow]")
+                    return
+                
+                # Get an output prefix
+                output_path = get_output_prefix()
+                console.print(output_path)
+                prefix = output_path.split("\\")[1]
+                
+                # Convert to SeqRecord objects and map to plasmids
+                with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress: 
+                    task_id = progress.add_task("Assembling selected sequences...", total = None)
+                    plasmids_required = designer.get_plasmid_names()
+                    assembly_sim = designer.gg_assembly(prefix)
+                    progress.update(task_id, completes = True)
+                if assembly_sim.errors: 
+                    if click.confirm("Return to part selection?"): 
+                        #reset state and try again
+                        designer.assemblies_names = None
+                        designer.assembly_sequences = []
+                        designer.plasmid_names = []
+                        designer.part_to_plasmid_mapping = {}
+                        designer.assembly = None
+                        designer.assembly_sim = None
+                        continue 
+                    else: 
+                        console.print("[yellow]Golden Gate design cancelled[/yellow]")
+                        return         
+                # For Successful assembly ask about saving outputs 
+                console.print("[green]Assembly Successful![/green]")
+                if click.confirm("Save Outputs?"): 
+                    
+                    designer.gg_save_output(output_path)
+                    designer.gg_instructions(output_path, prefix)
+                #exit loop on successful assembly    
+                break
+
+            except KeyboardInterrupt: 
+                console.print("[yellow]Operation canceled[/yellow]")
+                return 
+            except Exception as e: 
+                console.print(f"[red]Unexpected error: {str(e)}[/red]")
+                if click.confirm("Return to part selection and try again?"): 
+                    continue 
+                else: 
+                    raise
+
+    except click.Abort:
+        console.print("\n[yellow]Operation cancelled[/yellow]")
     
 @click.group()
 def cli():
@@ -864,12 +964,12 @@ def integrate(homology_length):
               help='Length of upstream homology for recombination (default: 300)')
 @click.option('--downstream_homology_len',
               type=int,
-              default=200,
-              help='Length of downstream homology for recombination (default: 200)')
+              default=100,
+              help='Length of downstream homology for recombination (default: 100)')
 @click.option('--repeat_length',
               type=int,
-              default=160,
-              help='Length of repeat sequence for marker removal (default: 160)')
+              default=80,
+              help='Length of repeat sequence for marker removal (default: 80)')
 @click.option('--genome_file',
               type=click.Path(exists=True, path_type=Path),
               default=Path("data/templates/BY4741_Toronto_2012.fsa"),
@@ -923,8 +1023,8 @@ def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome
               help='Length of downstream homology for recombination (default: 200)')
 @click.option('--repeat_length',
               type=int,
-              default=160,
-              help='Length of repeat sequence for marker removal (default: 160)')
+              default=80,
+              help='Length of repeat sequence for marker removal (default: 80)')
 @click.option('--genome_file',
               type=click.Path(exists=True, path_type=Path),
               default=Path("data/templates/BY4741_Toronto_2012.fsa"),
@@ -1003,7 +1103,29 @@ def batch(reuse_limit):
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
         raise click.Abort()
-    
+
+@cli.command()
+@click.option('--library', 
+              type = bool, 
+              default = False, 
+              help = 'Assemble selections in a single reaction to create a library of constructs (default: False)')
+def gg(library):
+    """Design golden gate cloning experiments in Saccharomyces cerevisiae
+    \b\n
+    Supports multiplex and library type assemblies
+    Use / to seperate component names you want to multiplex with, or input /allX to select all components of type X
+    The designer can handle parts input out of order, although this can make it hard to see what you're doing and will 
+    idenify the correct enzyme for the parts you've selected automatically. 
+    """
+    try:
+        designer = ggDesigner(is_library = library)
+        run_gg_interactive_mode(designer)
+    except click.Abort:
+        raise
+    except Exception as e:
+        console.print(f"[red]Error: {str(e)}[/red]")
+        raise click.Abort()
+
 if __name__ == '__main__':
     cli()
     

@@ -1,0 +1,6 @@
+Part	F_Plate	F_Name	F_Well	R_Plate	R_Name	R_Well	Template	Size
+Ura3MX_Up	N/A	Ura3MX_Up_F	N/A	Demo Plate	Ura3MX_Up_R-pTEF1	D8	pTw_Ura3Mx	1863
+pTEF1	Demo Plate	pTEF1_F-Ura3MX_Up	D9	Demo Plate	pTEF1_R-YeGFP	D10	chr16	462
+YeGFP	Demo Plate	YeGFP_F-pTEF1	D11	N/A	YeGFP_R-tDIT1	N/A	YeGFP-pTwistAmp-Highcopy	770
+tDIT1	N/A	tDIT1_F-YeGFP	N/A	N/A	tDIT1_R-Ura3MX_down	N/A	chr04	484
+Ura3MX_down	N/A	Ura3MX_down_F-tDIT1	N/A	N/A	Ura3MX_down_R	N/A	pTw_Ura3Mx	251

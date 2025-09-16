@@ -46,3 +46,17 @@ replace: Similar to del this script designs DNA fragments that can be used to re
 batch: regenate instructions files for previously designed tar and integrate command outputs stored in the output file. You might need to do this for example after ordering primers or adding templates sequences to ./data/templates. 
 
 For more details see our [pre-print](https://doi.org/10.1101/2025.05.19.655004) on BioRxiv 
+
+
+## Version 1.1 Adds support for Janus liquid handlering robots and for MoClo Golden gate assemblies. 
+
+The following Kits come preloaded: 
+- Yeast ToolKit: [Addgene](https://www.addgene.org/kits/moclo-ytk/) from [Lee at al, 2015](http://doi.org/10.1021/sb500366v)
+
+- Yeast Secretion and Display Toolkit: [Addgene](https://www.addgene.org/kits/young-moclo-ysd/) from [O'Riordan et al, 2023](https://doi.org/10.1021/acssynbio.3c00743)
+
+- OPENPichia MoClo Kit: [BCCM](https://bccm.belspo.be/GeneCorner-OPENPichia) from [Claes et al, 2024](https://www.nature.com/articles/s41564-023-01574-w)
+
+New components can be added to any oy these kits by saving a fasta file to .data/component libraries/*kit_name* and a gb file of the MoClo complatable lvl 0 plasmid to .data/components libraries/*kit_name*/plasmids. For liquid handling the plasmid name should be added to a well in .data/templates/TemPlates.xlsx
+
+To add new golden gate kits save fasta files describing the parts to a new folder in data/component libraries and the lvl 0 plasmids saved in a plasmids subfolder in the same directory. For liquid handling it is often simpliest to save a new 96 plate in .data/templates/TemPlates.xlsx as a new sheet. Be sure the positions of these plasmids are accurate. 

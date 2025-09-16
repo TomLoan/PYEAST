@@ -33,6 +33,7 @@ from Bio.Seq import Seq
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress
+import click
 from prompt_toolkit import PromptSession 
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.shortcuts import confirm
@@ -129,7 +130,7 @@ class TARDesigner:
                 for i, name in enumerate(selected, 1):
                     self.console.print(f"{i}. {name}")
 
-                if confirm("\nProceed with these sequences?"):
+                if click.confirm("\nProceed with these sequences?"):
                     return selected
                 
             except KeyboardInterrupt:

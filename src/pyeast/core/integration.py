@@ -30,6 +30,7 @@ from typing import Dict, List, Tuple
 from Bio.SeqRecord import SeqRecord
 from rich.console import Console
 from rich.table import Table
+import click
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.shortcuts import confirm
@@ -141,7 +142,7 @@ class IntegrationDesigner:
                     self.console.print(f"{i}. {seq.id}")
                 self.console.print(f"Integration site: {int_site}")
 
-                if confirm("Is this correct?"):
+                if click.confirm("Is this correct?"):
                     assembled_sequences = [upstream_seq] + component_seqs + [downstream_seq]
                     #self.console.print(f"Returning {len(assembled_sequences)} sequences")  # Debug print
                     self.assembly_sequences = assembled_sequences

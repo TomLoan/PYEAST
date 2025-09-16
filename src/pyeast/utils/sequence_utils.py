@@ -23,9 +23,6 @@ Sequence utilities for PYEAST.
 
 # ===========================================================================
 
-
-
-
 import os 
 import io
 import math
@@ -98,8 +95,6 @@ def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]
         if file_path.endswith(('.fasta', '.fsa', '.fa', '.gb', '.gbk')):
             format = "fasta" if file_path.endswith(('.fasta', '.fa','.fsa')) else "genbank"
             for record in SeqIO.parse(file_path, format):
-                #print(record.name)
-                #print(record.annotations)
                 templates[record.name] = record.seq
 
     for part in parts:
@@ -216,6 +211,8 @@ def write_circular_instructions(rationalized_primers: Dict[str, Dict],
                 amplicon_length
             ]
             instructions.append(instruction)
+        else: 
+            print(f"primer(s) missing for {part_name}")
     
     return instructions
 

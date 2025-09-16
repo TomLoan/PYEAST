@@ -180,7 +180,8 @@ license-check.txt
 
 # keep data dir, even if empty
 !./data/
-
+data/private/
+Batch instructions/
 output/
 .ruff_cache
 .mypy_cache
