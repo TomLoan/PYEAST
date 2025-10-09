@@ -64,7 +64,7 @@ class ggDesigner:
 
     def __init__(self,
                  template_folder: Path = Path("data/templates"), 
-                 instruments: List = ['Janus', 'epMotion', 'Human'], 
+                 instruments: List = ['Janus', 'epMotion', 'Hamilton', 'Human'], 
                  is_library: bool = False
                  ): 
         """Inintialise a new gg_lvl1 designer. 
@@ -340,8 +340,8 @@ class ggDesigner:
         self.part_to_plasmid_mapping = part_to_plasmid 
         self.plasmid_names = required_plasmids
 
-        # Show mapping summary
-        self.console.print(f"[green]Successfully mapped {len(all_part_names)} parts to {len(required_plasmids)} plasmids[/green]")
+        # Show mapping summary - too verbose, but useful for debugging
+        # self.console.print(f"[green]Successfully mapped {len(all_part_names)} parts to {len(required_plasmids)} plasmids[/green]")
         
         # # Show detailed mapping
         # table = Table(title="Part to Plasmid Mapping")
@@ -381,6 +381,7 @@ class ggDesigner:
         )
         self.repository = repository 
         
+        
         # Create Type 2 restriction assembly with the required plasmids 
         #  not sure if I'll need (all) the state storage for something or not
         assembly = dc.Type2sRestrictionAssembly(
@@ -418,6 +419,13 @@ class ggDesigner:
         actual_constructs = len(simulation.construct_records)
         if actual_constructs != expected_constructs: 
             self.console.print(f"[yellow]Expected {expected_constructs}, got {actual_constructs}[/yellow]")
+            mixes = list(record["parts"] for record in simulation.compute_all_construct_data_dicts())
+            if len(mixes)>0:
+                self.console.print("Mixtures found:")
+                self.console.print(f"used {assembly.enzyme}")
+                for mix in mixes: 
+                    self.console.print(mix)
+                    
         elif actual_constructs == expected_constructs: 
             self.console.print(f"generated {expected_constructs} constructs as expected using [blue]{assembly.enzyme}[/blue]")
 
@@ -441,7 +449,7 @@ class ggDesigner:
         
 
     def gg_instructions(self, output_path: str, assembly_name: str): 
-        """Generates human readable and [optionally] machine specific instructions 
+        """Generates human readable or machine specific instructions 
         this will just boil down to a table of what plasmids to include and where they are
         I will save this in the appropriate folder - but I'd like to make it possible to 
         run a gg_lvl1 with an option to start here from an existing folder full of plasmids 
@@ -482,17 +490,18 @@ class ggDesigner:
         completer = WordCompleter(self.instruments, ignore_case=True)
         liquid_handler = self.session.prompt(f"Select a liquid handler for instruction formating: ", completer=completer).strip().lower()
 
-        if liquid_handler == "janus": 
+        if liquid_handler == "janus" or liquid_handler == "hamilton":
             # instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
             instructions_dataframe[['asperate_plate', 'asperate_well']] = pd.DataFrame(instructions_dataframe['wells'].to_list())
             instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
             janus_instructions = instructions_dataframe[['construct_id', 'asperate_plate', 'asperate_well', 'destination_well']].copy()
             janus_instructions['transfer_volume'] = 1
             janus_instructions['destination_plate'] = 'assembly plate' # need in increment this up by one ever 96 assemblies (will this ever happen? It's so much material!)
+            janus_instructions = janus_instructions[['construct_id', 'asperate_plate', 'asperate_well', 'destination_plate', 'destination_well', 'transfer_volume']]
             janus_instructions.to_csv(f"{output_path}/{assembly_name}_worklist.csv", index = False)
-            self.console.print(f"Saved output to {output_path}/{assembly_name}_worklist.csv")
+            self.console.print(f"Saved output to {output_path}\\{assembly_name}_worklist.csv")
 
-            # For single head machines you can use these parameters to save tips. Different, v. complex implementation required for multi see CRVP paper by Wu et al 2025
+            # For single head machines you can use these columns to save tips. Different, v. complex implementation required for multi see CRVP paper by Wu et al 2025
             # instructions_dataframe = instructions_dataframe.sort_values(by = ['asperate_plate','asperate_well'])
             # janus_instructions['new_tip'] = (
             #     janus_instructions['asperate_well'] != janus_instructions['asperate_well'].shift()).map({True:'T', False: 'F'})
@@ -502,7 +511,6 @@ class ggDesigner:
             # janus_instructions.loc[len(janus_instructions)-1, 'drop_tip'] = 'T'
 
         elif liquid_handler == 'epmotion':
-            
             header = [
                 ['Labware', 'Src.Barcode', 'Src.List Name', 'Dest.Barcode', 'Dest.List name', '', '', ''],
                 ['', '', '', '', '', '', '', ''],
@@ -540,7 +548,49 @@ class ggDesigner:
             self.console.print(f"Saved epMotion instructions to {output_path} as {assembly_name}_epmotion_instructions.csv")
             
         elif liquid_handler == 'human': 
-            pass                                 
+            volume_per_part = 1  # µL
+            filename = f'{output_path}/{assembly_name}_human_instructions.txt'
+            
+            with open(filename, 'w') as f:
+                f.write('Human Assembly Instructions\n')
+                f.write('='*70 + '\n\n')
+                
+                # Group by construct and destination well
+                grouped = instructions_dataframe.groupby(['construct_id', 'destination_well'])
+                
+                for (construct, dest_well), group in grouped:
+                    # Get construct info from first row (all same for this construct)
+                    first_row = group.iloc[0]
+                    
+                    # Header
+                    f.write('='*70 + '\n')
+                    f.write(f'CONSTRUCT: {construct:12s} ---> Destination: {dest_well}\n')
+                    f.write('='*70 + '\n')
+                    f.write(f'Total parts: {first_row["number_of_parts"]} | ')
+                    f.write(f'Construct size: {first_row["construct_size"]} bp | ')
+                    f.write(f'Volume: {volume_per_part} µL each\n')
+                    f.write(f'Enzyme: {first_row["enzymes"][0]}\n\n')
+                    
+                    # Parts checklist
+                    f.write('PARTS TO ADD:\n')
+                    parts_list = first_row['parts']  # Get the full parts list
+                    for idx, (_, row) in enumerate(group.iterrows()):
+                        plate, well = row['wells']
+                        part_name = parts_list[idx] if idx < len(parts_list) else 'part'
+                        f.write(f'[ ] {part_name:15s} | {plate:15s} {well:3s} | {volume_per_part} µL\n')
+                    
+                    # Master mix
+                    f.write('\nMASTER MIX:\n')
+                    f.write('[ ] 2.0 µL   10X T4 Ligase Buffer\n')
+                    f.write(f'[ ] 2.0 µL   {first_row["enzymes"][0]} NEB master mix\n')
+                    f.write(f'[ ] {16 - (volume_per_part*len(group)):.1f } µL Water (20 µL total)\n')
+                    
+                    f.write('\n[ ] Assembly complete\n')
+                    f.write('\n\n')
+                self.console.print(f"Saved instructions to {output_path} as {assembly_name}_human instructions.txt")
+    
+    
+                                             
 
     def _get_template_position(self, template_name: str) -> Tuple[Optional[str], Optional[str]]:
         """Find the plate and well position for a given template.
