@@ -37,6 +37,7 @@ from prompt_toolkit.completion import WordCompleter
 from PIL import Image
 from Bio import SeqIO
 from datetime import datetime
+from tabulate import tabulate
 
 from ..core.tar import TARDesigner
 from ..core.integration import IntegrationDesigner
@@ -844,6 +845,7 @@ def run_gg_interactive_mode(designer: ggDesigner):
                 # Display sequences and get assembly order
                 designer.print_sequence_grid(sequences)
                 assembly_order = designer.get_assembly_order(sequences)
+                #console.print(assembly_order)
                 
                 if not assembly_order: 
                     console.print("[yellow]No assembly selected[{]/yellow]")
@@ -879,6 +881,15 @@ def run_gg_interactive_mode(designer: ggDesigner):
                     
                     designer.gg_save_output(output_path)
                     designer.gg_instructions(output_path, prefix)
+                    
+                    #Save the input to file for future reference
+                    if len(assembly_order) == 1: 
+                        assemblies_file = f'{output_path}/input.txt'
+                    elif len(assembly_order) > 1: 
+                        assemblies_file = f'{output_path}/inputs.txt'
+                    
+                    with open(assemblies_file, 'w') as f: 
+                        f.write(tabulate(assembly_order))
                 #exit loop on successful assembly    
                 break
 

@@ -583,7 +583,7 @@ class ggDesigner:
                     f.write('\nMASTER MIX:\n')
                     f.write('[ ] 2.0 µL   10X T4 Ligase Buffer\n')
                     f.write(f'[ ] 2.0 µL   {first_row["enzymes"][0]} NEB master mix\n')
-                    f.write(f'[ ] {16 - (volume_per_part*len(group)):.1f } µL Water (20 µL total)\n')
+                    f.write(f'[ ] {(16 - (volume_per_part*len(group))):.1f} µL Water (20 µL total)\n')
                     
                     f.write('\n[ ] Assembly complete\n')
                     f.write('\n\n')
