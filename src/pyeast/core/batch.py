@@ -74,7 +74,7 @@ class BatchDesigner:
                 ['', '', '', '', '', '', '', ''],
                 ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
             ]
-    JANUS_HEADER = [['Asp plate', 'Asp pos', 'Vol', 'Disp plate', 'Disp pos']]
+    JANUS_HEADER = [['construct_id', 'asperate_well', 'destination_plate', 'destination_well', 'transfer_volume']]
     
     def __init__(self,
                  reuse_limit = 5,
@@ -1126,29 +1126,31 @@ class BatchDesigner:
             row_letter = chr(65 + ((i-1) // 12))  # A, B, C, etc.
             col_number = ((i-1) % 12) + 1        # 1, 2, 3, etc.
             pcr_well = f"{row_letter}{col_number}"
-            
+            ## to do: link assembly plate # to batch number for v. large assemblies
             # Add forward primer transfer
             if row[4] != "N/A":  # F_Plate exists
                 janus_instructions.append([
+                    row[2],  # construct id
                     row[4],  # F_Plate (Barcode ID)
                     row[5],  # F_Well (Source)
-                    '1', # Volume in µL
-                    "Assembly plate",  # Destination plate ID (single plate for now)
-                    ## to do: link assembly plate # to batch number for v. large assemblies
-                    pcr_well,  # PCR well position (e.g., A1, B5)
+                    "PCR_plate",  # Destination plate ID (single plate for now)
                     
+                    pcr_well,  # PCR well position (e.g., A1, B5)
+                    '1'         # Volume in µL
                     
                 ])
                 
             # Add reverse primer transfer
             if row[7] != "N/A":  # R_Plate exists
                 janus_instructions.append([
+                    row[2],  # construct d   
                     row[7],  # R_Plate (Barcode ID)
                     row[8],  # R_Well (Source)
-                    '1',     # Volume in µL
-                    "Assembly plate",  # Destination plate ID place holder  
+                    
+                    "PCR_plate",  # Destination plate ID place holder  
                         ## to do: link assembly plate # to batch number for v. large assemblies
                     pcr_well,  # PCR well position (e.g., A1, B5) 
+                    '1',     # Volume in µL
                 ])
                 
             # Add template transfer if template exists
@@ -1156,16 +1158,17 @@ class BatchDesigner:
                 template_plate, template_well = self._get_template_position(row[9])
                 if template_plate and template_well:
                     janus_instructions.append([
-                        template_plate,  # Barcode ID
+                        row[2],         #construct id
+                        template_plate, # Barcode ID
                         template_well,  # Source well
-                        '1',
-                        "Assembly plate",  # Destination plate ID
+                        "PCR_plate",  # Destination plate ID
                         ## to do: link assembly plate # to batch number for v. large assemblies
                         pcr_well,  # PCR well position (e.g., A1, B5)
+                        '1',       # volume in µL
                     ])
         
         # Save instructions to CSV
-        output_file = self.instructions_folder / f"{timestamp}_janus_instructions.csv"
+        output_file = self.instructions_folder / f"{timestamp}_worklist.csv"
         with open(output_file, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerows(janus_instructions)
@@ -1301,7 +1304,7 @@ class BatchDesigner:
                 
             return str(assembly_file)
                 
-        if machine_type.lower() == 'janus': 
+        if machine_type.lower() == 'janus' or machine_type.lower() == 'hamilton': 
             # Create janus format instructions
             instructions = [row[:] for row in self.JANUS_HEADER]
             
@@ -1315,15 +1318,16 @@ class BatchDesigner:
                 for well_num in required_wells:
                     source_well = well_num_to_a1(well_num)
                     instructions.append([
-                        f"plate {str(batch_num)}", # Source plate is batch number
+                        construct,                 # consruct id
+                        f"plate_{str(batch_num)}", # Source plate is batch number
                         source_well,               # Source well in A1-H12 format
+                        "assembly_plate",          # name for the destination plate
+                        assembly_wells[construct], # Destination well
                         "2",                       # Volume in µL (typical for yeast assembly)
-                        "Assembly plate",          # name for the destination plate
-                        assembly_wells[construct] # Destination well
                     ])
             
             # Save instructions
-            assembly_file = self.instructions_folder / f"{timestamp}_assembly_janus_instructions.csv"
+            assembly_file = self.instructions_folder / f"{timestamp}_assembly_worlist.csv"
             with open(assembly_file, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerows(instructions)

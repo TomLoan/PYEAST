@@ -113,7 +113,7 @@ def handle_machine_instructions(designer: BatchDesigner) -> None:
 
     if click.confirm("\nWould you like to generate machine instructions for liquid handling?"):
         # Select from available machines
-        machines = ['epMotion', 'Janus']
+        machines = ['epMotion', 'Janus', 'Hamilton']
         
         print("\nAvailable liquid handling machines:")
         for i, machine in enumerate(machines, 1):
@@ -136,8 +136,8 @@ def handle_machine_instructions(designer: BatchDesigner) -> None:
                 except Exception as e:
                     print(f"\nError generating machine instructions: {str(e)}")
 
-        if selection == "janus":
-            if click.confirm("Generate Janus instructions?"):
+        if selection == "janus"or selection =='hamilton':
+            if click.confirm(f"Generate worklist for {selection}?"):
                 try:
                     timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
                     #write instructions for the PCR set up

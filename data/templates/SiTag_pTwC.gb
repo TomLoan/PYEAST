@@ -1,4 +1,4 @@
-LOCUS       SiTag_in_pTwist_Chlor 2857 bp ds-DNA     circular     01-SEP-2025
+LOCUS       SiTag_pTwC 2857 bp ds-DNA     circular     01-SEP-2025
 DEFINITION  SiTag in pTwist Chlor High Copy
 COMMENT     Imported using the Genbank importer. File name: SiTag.gb Resistance
             markers: Chloramphenicol This file was created using tools provided

@@ -97,7 +97,7 @@ class ggDesigner:
         self.template_dict = {}           # Template information
         self.repository = None            # dnacauldron object constructed from all lvl 0 parts plasmids for gg assembly
         self.assembly = None              # Assembly object from dnacauldron
-        self.assembly_sim = None                # Simulation object from dnacauldron
+        self.assembly_sim = None          # Simulation object from dnacauldron
         self.final_assembly = None        # Final assembled sequence(s)
 
 
