@@ -74,7 +74,7 @@ class BatchDesigner:
                 ['', '', '', '', '', '', '', ''],
                 ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
             ]
-    JANUS_HEADER = [['Asp plate', 'Asp pos', 'Vol', 'Disp plate', 'Disp pos']]
+    JANUS_HEADER = [['construct_id', 'asperate_well', 'destination_plate', 'destination_well', 'transfer_volume']]
     
     def __init__(self,
                  reuse_limit = 5,
@@ -562,6 +562,8 @@ class BatchDesigner:
                 annealing = r_primer_seq[-i:] if i > 0 else r_primer_seq
                 if comp_end_rc.startswith(annealing):
                     r_homology = r_primer_seq[:-i] if i > 0 else ''
+                    r_homology = Seq(r_homology)
+                    r_homology = str(r_homology.reverse_complement())
                     break
                     
             if r_homology is None:
@@ -616,6 +618,12 @@ class BatchDesigner:
                 # Check if we've exceeded reuse limit
                 if self.pcr_reactions[reaction_id]['total_uses'] > self.reuse_limit:
                     self.pcr_reactions[reaction_id]['needs_repeats'] = True
+                    total_uses = self.pcr_reactions[reaction_id]['total_uses']
+                    # calculate the number of additional wells beyond the first required
+                    num_repeats_needed = (total_uses - 1)//self.reuse_limit 
+                    self.pcr_reactions[reaction_id]['num_repeats_needed'] = num_repeats_needed
+                else: 
+                    self.pcr_reactions[reaction_id]['num_repeats_needed'] = 0
                 
                 construct_reactions.append(reaction_id)
             
@@ -658,7 +666,7 @@ class BatchDesigner:
         # Print summary
         self.console.print("\n[bold cyan]PCR Reaction Summary:[/bold cyan]")
         total_reactions = len(self.pcr_reactions)
-        repeated_reactions = sum(1 for r in self.pcr_reactions.values() if r['needs_repeats'])
+        repeated_reactions = sum(r['num_repeats_needed'] for r in self.pcr_reactions.values())
         self.console.print(f"Total unique reactions: {total_reactions}")
         self.console.print(f"Reactions needing repeats: {repeated_reactions}")
         
@@ -680,7 +688,7 @@ class BatchDesigner:
         This function:
         1. Groups PCR reactions into batches of batch_size (default 96)
         2. Keeps reactions for the same construct together when possible
-        3. Handles repeated reactions needed due to reuse limits
+        3. Handles arbitarary numbers of repeated reactions needed due to reuse limits
         4. Maintains order from user's construct selection
         
         The batched_reactions list will contain dictionaries with structure:
@@ -694,7 +702,7 @@ class BatchDesigner:
                     'reverse_primer': dict,
                     'template': str,
                     'constructs': List[str],
-                    'is_repeat': bool
+                    'num_repeats_needed': int
                 },
                 ...
             ],
@@ -732,9 +740,12 @@ class BatchDesigner:
                 # Count original reaction
                 if reaction_id not in processed_reactions:
                     reactions_needed.append(reaction_id)
-                # Count repeat if needed
-                if reaction['needs_repeats'] and f"{reaction_id}_repeat" not in processed_reactions:
-                    reactions_needed.append(f"{reaction_id}_repeat")
+                # Count all repeats if needed
+                num_repeats = reaction['num_repeats_needed']
+                for repeat_num in range(1, num_repeats + 1): 
+                    repeat_id = f'{reaction_id}_repeat{repeat_num}'
+                    if repeat_id not in processed_reactions: 
+                        reactions_needed.append(repeat_id)
             
             # If current batch would overflow, start a new one
             if len(current_batch['reactions']) + len(reactions_needed) > self.batch_size:
@@ -761,25 +772,30 @@ class BatchDesigner:
                         'template': self.rationalized_templates[reaction['component_name']],
                         'constructs': reaction['used_in_constructs'],
                         'is_repeat': False,
+                        'repeat_number': 0,
                         'product_length': product_length
                     }
                     current_batch['reactions'].append(reaction_info)
                     processed_reactions.add(reaction_id)
                 
-                # Add repeat reaction if needed
-                if reaction['needs_repeats'] and f"{reaction_id}_repeat" not in processed_reactions:
-                    repeat_info = {
-                        'reaction_id': f"{reaction_id}_repeat",
-                        'component_name': reaction['component_name'],
-                        'forward_primer': reaction['forward_primer'],
-                        'reverse_primer': reaction['reverse_primer'],
-                        'template': self.rationalized_templates[reaction['component_name']],
-                        'constructs': reaction['used_in_constructs'],
-                        'is_repeat': True, 
-                        'product_length' : product_length
-                    }
-                    current_batch['reactions'].append(repeat_info)
-                    processed_reactions.add(f"{reaction_id}_repeat")
+                # Add all repeat reactions if needed
+                num_repeats = reaction['num_repeats_needed']
+                for repeat_num in range(1, num_repeats+1): 
+                    repeat_id = f"{reaction_id}_repeat{repeat_num}"
+                    if repeat_id not in processed_reactions:
+                        repeat_info = {
+                            'reaction_id': repeat_id,
+                            'component_name': reaction['component_name'],
+                            'forward_primer': reaction['forward_primer'],
+                            'reverse_primer': reaction['reverse_primer'],
+                            'template': self.rationalized_templates[reaction['component_name']],
+                            'constructs': reaction['used_in_constructs'],
+                            'is_repeat': True, 
+                            'repeat_number': repeat_num,
+                            'product_length' : product_length
+                        }
+                        current_batch['reactions'].append(repeat_info)
+                        processed_reactions.add(f"{reaction_id}_repeat")
             
             # If we got all reactions for this construct, mark it as complete
             if construct_complete:
@@ -910,19 +926,24 @@ class BatchDesigner:
         
         # Build lookup for well positions from batched reactions
         # Key: (batch_num, complete_product) -> well_position
+        # reaction_id_with_suffix can be "original_id", "original_id_repeat1", "original_id_repeat2", etc.
         reaction_wells = {}
         
-        # Process each batch
+        # Process each batch to assign wells to reactions
         for batch in self.batched_reactions:
             batch_num = batch['batch_number']
             for reaction in batch['reactions']:
                 reaction_id = reaction['reaction_id']
                 # Get complete product sequence from pcr_reactions
-                complete_product = self.pcr_reactions[reaction_id]['complete_product']
-                well_key = (batch_num, complete_product)
+                # complete_product = self.pcr_reactions[reaction_id]['complete_product']
+                # Store well with full reaction_id (including _repeatN suffix if present)
+                well_key = (batch_num, reaction_id)
                 # If this exact product already has a well, reuse it
                 if well_key not in reaction_wells:
                     reaction_wells[well_key] = f"Well {len(reaction_wells) + 1}"
+
+        # Track usage count per reaction across all constructs in order
+        reaction_usage_count = {} # reaction_id -> current usage count
         
         assembly_groups = []
         # Add header
@@ -933,7 +954,7 @@ class BatchDesigner:
         # Process each construct that can be completed in this batch
         for batch in self.batched_reactions:
             batch_num = batch['batch_number']
-            
+
             # Process each construct that can be completed in this batch
             for construct_name in batch['constructs_completed']:
                 construct_info = self.assembly_requirements[construct_name]
@@ -943,20 +964,38 @@ class BatchDesigner:
                 required_wells = []
                 
                 for reaction_id in construct_info['required_reactions']:
-                    # Find the reaction in the current batch
-                    complete_product = self.pcr_reactions[reaction_id]['complete_product']
-                    well_key = (batch_num, complete_product)
+                    # Initialize usage count if not seen before
+                    if reaction_id not in reaction_usage_count: 
+                        reaction_usage_count[reaction_id] = 0
+                    reaction_usage_count[reaction_id] += 1
+                    curent_use = reaction_usage_count[reaction_id]
+
+                    # Determine which repeat number to use based on the usage count
+                    # 1- reuse_limit: repeat_number = 0 (original)
+                    # reuse_limit + 1 - 2x reuse_limit = 1 (first repeat) etc
+                    repeat_number = (curent_use -1)//self.reuse_limit
+
+                    # Construct the appropriate reaction_id with suffix 
+                    if repeat_number == 0: 
+                        # use original reaction well 
+                        well_key = (batch_num, reaction_id)
+
+                    else: 
+                        # Use repeat reaction well 
+                        well_key = (batch_num, f"{reaction_id}_repeat{repeat_number}")                        
+
                     if well_key in reaction_wells:
                         well = reaction_wells[well_key]
                         required_wells.append(well)
-                        #required_reactions.append(reaction_id)
-                
+                    else: 
+                        # incase there is a bug in organize_PCR_batches
+                        self.console.print(f"[yellow]Warning: Could not find well for {well_key[1]} in {batch_num}[/yellow]")
+                        self.console.print(f"[yellow]Current use: {curent_use}, repeat number: {repeat_number}, Reuse limit: {self.reuse_limit}[/yellow]")
                 # Create assembly group row
                 row = [
                     batch_num,
                     construct_name,
                     ", ".join(required_wells),
-                    #", ".join(required_reactions),
                     construct_info['topology']
                 ]
                 assembly_groups.append(row)
@@ -1126,29 +1165,31 @@ class BatchDesigner:
             row_letter = chr(65 + ((i-1) // 12))  # A, B, C, etc.
             col_number = ((i-1) % 12) + 1        # 1, 2, 3, etc.
             pcr_well = f"{row_letter}{col_number}"
-            
+            ## to do: link assembly plate # to batch number for v. large assemblies
             # Add forward primer transfer
             if row[4] != "N/A":  # F_Plate exists
                 janus_instructions.append([
+                    row[2],  # construct id
                     row[4],  # F_Plate (Barcode ID)
                     row[5],  # F_Well (Source)
-                    '1', # Volume in µL
-                    "Assembly plate",  # Destination plate ID (single plate for now)
-                    ## to do: link assembly plate # to batch number for v. large assemblies
-                    pcr_well,  # PCR well position (e.g., A1, B5)
+                    "PCR_plate",  # Destination plate ID (single plate for now)
                     
+                    pcr_well,  # PCR well position (e.g., A1, B5)
+                    '1'         # Volume in µL
                     
                 ])
                 
             # Add reverse primer transfer
             if row[7] != "N/A":  # R_Plate exists
                 janus_instructions.append([
+                    row[2],  # construct d   
                     row[7],  # R_Plate (Barcode ID)
                     row[8],  # R_Well (Source)
-                    '1',     # Volume in µL
-                    "Assembly plate",  # Destination plate ID place holder  
+                    
+                    "PCR_plate",  # Destination plate ID place holder  
                         ## to do: link assembly plate # to batch number for v. large assemblies
                     pcr_well,  # PCR well position (e.g., A1, B5) 
+                    '1',     # Volume in µL
                 ])
                 
             # Add template transfer if template exists
@@ -1156,16 +1197,17 @@ class BatchDesigner:
                 template_plate, template_well = self._get_template_position(row[9])
                 if template_plate and template_well:
                     janus_instructions.append([
-                        template_plate,  # Barcode ID
+                        row[2],         #construct id
+                        template_plate, # Barcode ID
                         template_well,  # Source well
-                        '1',
-                        "Assembly plate",  # Destination plate ID
+                        "PCR_plate",  # Destination plate ID
                         ## to do: link assembly plate # to batch number for v. large assemblies
                         pcr_well,  # PCR well position (e.g., A1, B5)
+                        '1',       # volume in µL
                     ])
         
         # Save instructions to CSV
-        output_file = self.instructions_folder / f"{timestamp}_janus_instructions.csv"
+        output_file = self.instructions_folder / f"{timestamp}_worklist.csv"
         with open(output_file, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerows(janus_instructions)
@@ -1301,7 +1343,7 @@ class BatchDesigner:
                 
             return str(assembly_file)
                 
-        if machine_type.lower() == 'janus': 
+        if machine_type.lower() == 'janus' or machine_type.lower() == 'hamilton': 
             # Create janus format instructions
             instructions = [row[:] for row in self.JANUS_HEADER]
             
@@ -1315,15 +1357,16 @@ class BatchDesigner:
                 for well_num in required_wells:
                     source_well = well_num_to_a1(well_num)
                     instructions.append([
-                        f"plate {str(batch_num)}", # Source plate is batch number
+                        construct,                 # construct id
+                        f"plate_{str(batch_num)}", # Source plate is batch number
                         source_well,               # Source well in A1-H12 format
+                        "assembly_plate",          # name for the destination plate
+                        assembly_wells[construct], # Destination well
                         "2",                       # Volume in µL (typical for yeast assembly)
-                        "Assembly plate",          # name for the destination plate
-                        assembly_wells[construct] # Destination well
                     ])
             
             # Save instructions
-            assembly_file = self.instructions_folder / f"{timestamp}_assembly_janus_instructions.csv"
+            assembly_file = self.instructions_folder / f"{timestamp}_assembly_worlist.csv"
             with open(assembly_file, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerows(instructions)
