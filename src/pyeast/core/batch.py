@@ -795,7 +795,7 @@ class BatchDesigner:
                             'product_length' : product_length
                         }
                         current_batch['reactions'].append(repeat_info)
-                        processed_reactions.add(f"{reaction_id}_repeat")
+                        processed_reactions.add(repeat_id)
             
             # If we got all reactions for this construct, mark it as complete
             if construct_complete:
