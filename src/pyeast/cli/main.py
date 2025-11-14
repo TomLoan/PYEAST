@@ -51,9 +51,27 @@ from .. utils.visualisation import visualise_genbank, save_figure
 console = Console()
 
 
-def get_output_prefix() -> str:
-    """Get output prefix from user - just the name not path, 
-    make sure it'll be a vaild file name and  and return the full path"""
+def get_output_prefix() -> Path:
+    """Get output prefix from user - creates a subfolder and returns path to files within it.
+    
+    This function:
+    1. Asks user for a name
+    2. Creates a subfolder in output/ with that name
+    3. Returns a Path object: output/name/name
+    
+    Example:
+        If user inputs "my_construct", this returns:
+        Path("output/my_construct/my_construct")
+        
+        Then files are saved as:
+        - output/my_construct/my_construct.gb
+        - output/my_construct/my_construct_primers.tsv
+        etc.
+    
+    Returns:
+        Path object pointing to files within the created subfolder.
+        Use .name property to get just the filename without path.
+    """
     session = PromptSession()
     output_dir = Path("output")
     
@@ -62,52 +80,43 @@ def get_output_prefix() -> str:
     
     while True:
         try:
-            console.print("\n[blue]Enter a name prefix for your output files[/blue]")
-            console.print("[dim]Files will be saved in the output directory[/dim]")
-            user_input = session.prompt("Name prefix: ").strip()
+            console.print("\n[blue]Enter a name for your output files[/blue]")
+            console.print("[dim]A subfolder will be created: output/your_name/[/dim]")
+            user_input = session.prompt("Name: ").strip()
             
             # Basic validation
             if not user_input:
                 console.print("[red]Please enter a name[/red]")
                 continue
                 
-            # Remove any path separators for safety
-            safe_name = "".join(c for c in user_input if c not in r'\/.')
+            # Remove any path separators and other invalid filename characters
+            # Keep alphanumeric, hyphens, underscores
+            safe_name = "".join(c for c in user_input if c not in r'\/.:*?"<>|')
             
-            if safe_name != user_input:
-                console.print(f"[yellow]Name adjusted to: {safe_name}[/yellow]")
+            if not safe_name:
+                console.print("[red]Invalid name after removing special characters[/red]")
+                continue
             
-            # Check if files would be overwritten
-            potential_files = [
-                output_dir / f"{safe_name}.gb",
-                output_dir / f"{safe_name}_map.png",
-                output_dir / f"{safe_name}_instructions.tsv",
-                output_dir / f"{safe_name}_missing_primers.tsv",
-                output_dir / f"{safe_name}_all_primers.tsv",
-                output_dir / f"{safe_name}_screening_primers.tsv",
-                output_dir / f"{safe_name}.fasta",
-                output_dir / safe_name
-            ]
+            # Create subfolder for this output
+            output_subfolder = output_dir / safe_name
+            output_subfolder.mkdir(exist_ok=True)
             
-            existing = [f for f in potential_files if f.exists()]
-            if existing:
-                console.print("[yellow]Warning: The following files already exist:[/yellow]")
-                for f in existing:
-                    console.print(f"  - {f.name}")
-                if not click.confirm("Risk overwriting these files?"):
-                    continue
+            console.print(f"[dim]Files will be saved to: {output_subfolder}/[/dim]")
             
-            return str(output_dir / safe_name)
-                
+            # Return path pointing to files within the subfolder
+            # e.g., Path("output/my_construct/my_construct")
+            return output_subfolder / safe_name
+            
         except KeyboardInterrupt:
-            if click.confirm("\nCancel output name selection?"):
-                raise click.Abort()
+            raise click.Abort()
 
-def handle_machine_instructions(designer: BatchDesigner) -> None:
+
+def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> None:
     """Ask user if they want to generate machine instructions and handle the response.
     
     Args:
         designer: BatchDesigner instance with completed assembly instructions
+        output_prefix: Path prefix for output files (same as human instructions)
     """
     session = PromptSession() 
 
@@ -127,27 +136,23 @@ def handle_machine_instructions(designer: BatchDesigner) -> None:
             if click.confirm("Generate epMotion instructions?"):
                 try:
                     timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
-                    #write instructions for the PCR set up
-                    designer.generate_epmotion_instructions(timestamp)
-                    #output_file = designer.generate_epmotion_instructions(timestamp)
-                    #write instructions for the assembly transforations
-                    designer.generate_machine_assembly_instructions('epmotion', timestamp)
-                    #print(f"\nMachine instructions saved to: {output_file}")
+                    # Write instructions for the PCR set up
+                    designer.generate_epmotion_instructions(output_prefix, timestamp)
+                    # Write instructions for the assembly transformations
+                    designer.generate_machine_assembly_instructions(output_prefix, 'epmotion', timestamp)
                 except Exception as e:
-                    print(f"\nError generating machine instructions: {str(e)}")
+                    console.print(f"[red]Error generating machine instructions: {str(e)}[/red]")
 
         if selection == "janus"or selection =='hamilton':
             if click.confirm(f"Generate worklist for {selection}?"):
                 try:
                     timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
-                    #write instructions for the PCR set up
-                    designer.generate_janus_instructions(timestamp)
-                    #output_file = designer.generate_janus_instructions(timestamp)
-                    #write instructions for the assembly transforations
-                    designer.generate_machine_assembly_instructions('janus', timestamp)
-                    #print(f"\nMachine instructions saved to: {output_file}")
+                    # Write instructions for the PCR set up
+                    designer.generate_janus_instructions(output_prefix, timestamp)
+                    # Write instructions for the assembly transformations
+                    designer.generate_machine_assembly_instructions(output_prefix, 'janus', timestamp)
                 except Exception as e:
-                    print(f"\nError generating machine instructions: {str(e)}")
+                    console.print(f"[red]Error generating machine instructions: {str(e)}[/red]")
            
     else: 
         pass
@@ -262,7 +267,7 @@ def run_tar_interactive_mode(designer: TARDesigner):
             # Generate assembly
             task_id = progress.add_task("Generating assembly...", total=None)
             assembly = designer.create_assembly()
-            assembly.name = output_prefix.split("\\")[1]
+            assembly.name = output_prefix.name
             progress.update(task_id, completed=True)
             
             # Get output prefix after design is confirmed
@@ -388,7 +393,7 @@ def run_integration_interactive_mode(designer: IntegrationDesigner):
         # Create assembly
         task_id = progress.add_task("Creating assembly...", total=None)
         assembly = designer.create_linear_assembly()
-        assembly.name = output_prefix.split("\\")[1]
+        assembly.name = output_prefix.name
         progress.update(task_id, completed=True)
         
         try:
@@ -529,7 +534,7 @@ def run_deletion_interactive_mode(designer: DeletionDesigner):
         output_prefix = get_output_prefix()
 
         #rename the deletion cassette to the user input 
-        designer.deletion_cassette.name = output_prefix.split("\\")[1]
+        designer.deletion_cassette.name = output_prefix.name
         
         # Save results
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
@@ -548,8 +553,8 @@ def run_deletion_interactive_mode(designer: DeletionDesigner):
             # Save primers
             forward_primer, reverse_primer = designer.screening_primers
             with open(f"{output_prefix}_screening_primers.tsv", 'w') as f:
-                f.write(f"{output_prefix.split("\\")[1]}_ScreenF\t{forward_primer}\n")
-                f.write(f"{output_prefix.split("\\")[1]}_ScreenR\t{reverse_primer}")
+                f.write(f"{output_prefix.name}_ScreenF\t{forward_primer}\n")
+                f.write(f"{output_prefix.name}_ScreenR\t{reverse_primer}")
                 
             # Generate and save map
             img_data, fig = visualise_genbank(f"{output_prefix}.gb")
@@ -677,7 +682,7 @@ def run_replace_interactive_mode(designer: ReplaceDesigner):
         # Get output prefix
         output_prefix = get_output_prefix()
 
-        designer.replacement_cassette.name = output_prefix.split("\\")[1]
+        designer.replacement_cassette.name = output_prefix.name
         
         # Save results
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
@@ -690,8 +695,8 @@ def run_replace_interactive_mode(designer: ReplaceDesigner):
             # Save primers
             forward_primer, reverse_primer = designer.screening_primers
             with open(f"{output_prefix}_screening_primers.tsv", 'w') as f:
-                f.write(f"{output_prefix.split("\\")[1]}_ScreenF\t{forward_primer}\n")
-                f.write(f"{output_prefix.split("\\")[1]}_ScreenR\t{reverse_primer}")
+                f.write(f"{output_prefix.name}_ScreenF\t{forward_primer}\n")
+                f.write(f"{output_prefix.name}_ScreenR\t{reverse_primer}")
                 
             # Generate and save map
             img_data, fig = visualise_genbank(f"{output_prefix}.gb")
@@ -796,6 +801,8 @@ def run_batch_interactive_mode(designer: BatchDesigner):
             try:
                 designer.generate_human_instructions(output_prefix)
                 designer.generate_assembly_groups(output_prefix)
+                # Save input record
+                designer.save_input_record(output_prefix)   
             except ValueError as e:
                 progress.update(task_id, completed=True)
                 console.print(f"\n[red]{str(e)}[/red]")
@@ -805,7 +812,7 @@ def run_batch_interactive_mode(designer: BatchDesigner):
         # Optionally generate machine instructions
         progress.update(task_id, completed=True)
            
-        handle_machine_instructions(designer) 
+        handle_machine_instructions(designer, output_prefix) 
            
         progress.update(task_id, completed=True)
 
@@ -854,7 +861,7 @@ def run_gg_interactive_mode(designer: ggDesigner):
                 # Get an output prefix
                 output_path = get_output_prefix()
                 console.print(output_path)
-                prefix = output_path.split("\\")[1]
+                prefix = output_path.name
                 
                 # Convert to SeqRecord objects and map to plasmids
                 with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress: 
