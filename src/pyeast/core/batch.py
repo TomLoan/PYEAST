@@ -43,6 +43,8 @@ from rich.table import Table
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.shortcuts import confirm
+from tabulate import tabulate
+from datetime import datetime
 import openpyxl
 import csv
 import click
@@ -81,8 +83,7 @@ class BatchDesigner:
                  batch_size: int = 96,
                  primer_folder: Path = Path("data/primers"),
                  template_folder: Path = Path("data/templates"),
-                 output_folder: Path = Path("output"),
-                 instructions_folder: Path = Path("Batch instructions")):
+                 output_folder: Path = Path("output")):
         """Initialize BatchDesigner with specified parameters.
         
         Args:
@@ -91,7 +92,6 @@ class BatchDesigner:
             primer_folder: Path to folder containing primer files
             template_folder: Path to folder containing template files
             output_folder: Path to store generated GenBank files
-            instructions_folder: Path to store batch instruction files
         """
         # Core parameters
         self.batch_size = batch_size
@@ -100,7 +100,6 @@ class BatchDesigner:
         self.primer_folder = primer_folder
         self.template_folder = template_folder
         self.output_folder = output_folder
-        self.instructions_folder = instructions_folder
         
         # Console setup
         self.console = Console()
@@ -118,24 +117,107 @@ class BatchDesigner:
         self.reuse_limit = reuse_limit
         self.batched_reactions = []
         self.output_folder.mkdir(exist_ok=True)
-        self.instructions_folder.mkdir(exist_ok=True)
     
     def load_constructs(self) -> None:
-        """Load available constructs from output directory."""
+        """Load available constructs from output directory and subfolders.
+        
+        Searches for .gb files in:
+        1. Root output directory (legacy files)
+        2. Subfolders within output directory (new organized structure)
+        
+        Only loads constructs suitable for batch processing (from tar/integrate commands).
+        Automatically excludes cassettes from replace/delete commands and gg assemblies.
+        """
+        VALID_DEFINITIONS = {
+            "Plasmid assembled by TAR cloning simulation",
+            "Assembled sequence for genomic integration"
+        }   
         self.available_constructs = {}
+        
+        # First, check for legacy files in the root output directory
+        legacy_count = 0
+        skipped_count = 0
         for filename in self.output_folder.glob("*.gb"):
             try:
                 record = SeqIO.read(filename, "genbank")
+
+                # Check if this is a valid target for batch processing
+                description = record.description
+                if description not in VALID_DEFINITIONS:
+                    skipped_count += 1
+                    # self.console.print(f"[dim]Skipped {filename.stem} (not a TAR/integrate output)[/dim]")
+                    continue
+                ## Use filename without extension as key (simple name only)
                 self.available_constructs[filename.stem] = record
+                record.annotations['source_folder'] = 'output/'
+                record.annotations['source_type'] = 'TAR' if 'TAR' in description else 'integrate'
+                legacy_count += 1   
             except Exception as e:
                 self.console.print(f"[red]Error reading {filename}: {str(e)}[/red]")
+        
+        # if legacy_count > 0:
+        #     self.console.print(f"[yellow]Found {legacy_count} legacy construct(s) in root output directory[/yellow]")
+        # if skipped_count > 0:
+        #     self.console.print(f"[dim]Skipped {skipped_count} file(s) (not TAR/integrate outputs)[/dim]")
+        
+        # Then, check subfolders for new organized structure
+        subfolder_count = 0
+        for subfolder in self.output_folder.iterdir():
+            if not subfolder.is_dir():
+                continue
+            
+            # Count .gb files in this subfolder
+            gb_files = list(subfolder.glob("*.gb"))
+            if not gb_files:
+                continue
                 
+            for filename in gb_files:
+                try:
+                    record = SeqIO.read(filename, "genbank")
+                    
+                    # Check if this is a valid target for batch processing
+                    description = record.description
+                    # print(description)
+                    if description not in VALID_DEFINITIONS:
+                          skipped_count += 1
+                          self.console.print(f"[dim]Skipped {subfolder.name}/{filename.stem} (not a TAR/integrate output)[/dim]")
+                          continue
+                    
+                    # Use ONLY the filename as key (no folder path)
+                    # This simplifies selection - user just types the construct name
+                    construct_name = filename.stem
+                    
+                    # Check for naming conflicts
+                    if construct_name in self.available_constructs:
+                        self.console.print(
+                            f"[yellow]Warning: Multiple constructs named '{construct_name}' found. "
+                            f"Using the one from {subfolder.name}/[/yellow]"
+                        )
+                    
+                    self.available_constructs[construct_name] = record
+                    
+                    # Store source folder for display and reference
+                    record.annotations['source_folder'] = subfolder.name
+                    record.annotations['source_type'] = 'TAR' if 'TAR' in description else 'integrate'
+                    subfolder_count += 1
+                        
+                except Exception as e:
+                    self.console.print(f"[red]Error reading {filename}: {str(e)}[/red]")
+        
+        if subfolder_count > 0:
+            self.console.print(f"[green]Found {subfolder_count} construct(s) in subfolders[/green]")
+        
         if not self.available_constructs:
-            raise ValueError("No GenBank files found in output directory")
+            raise ValueError(
+                "No valid GenBank files found for batch processing.\n"
+                "Make sure you've run 'tar' or 'integrate' commands first to generate constructs."
+            )
+        
+        self.console.print(f"[bold green]Loaded {len(self.available_constructs)} total construct(s)[/bold green]")
     
     def print_construct_grid(self) -> None:
         """
-        Display available constructs in a formatted table.
+        Display available constructs in a formatted table with source information.
         
         Raises:
             ValueError: If no constructs have been loaded
@@ -143,16 +225,22 @@ class BatchDesigner:
         if not self.available_constructs:
             raise ValueError("No constructs loaded. Run load_constructs first.")
             
-        table = Table(title="Available Constructs")
+        table = Table(title="Available Constructs for Batch Processing")
         table.add_column("Name", style="cyan")
+        table.add_column("Type", style="blue")  # TAR or integrate
+        table.add_column("Source", style="yellow")
         table.add_column("Topology", style="green")
         table.add_column("Length", justify="right", style="blue")
         table.add_column("Components", justify="right", style="magenta")
-        table.add_column("Parts", style="yellow")
+        table.add_column("Parts", style="white")
         
         for name, record in self.available_constructs.items():
             # Get topology from full sequence
             is_circular = record.annotations.get('topology', '').lower() == 'circular'
+            
+            # Get source folder and type
+            source = record.annotations.get('source_folder', 'output/')
+            source_type = record.annotations.get('source_type', 'unknown')
             
             # Get components from misc_features
             components = []
@@ -163,11 +251,13 @@ class BatchDesigner:
             
             # Format component list
             component_str = ", ".join(components)
-            if len(component_str) > 150:
-                component_str = component_str[:147] + "..."
+            if len(component_str) > 120:
+                component_str = component_str[:117] + "..."
             
             table.add_row(
-                name,
+                name,  # Just the name, no folder path
+                source_type,
+                source,
                 "Circular" if is_circular else "Linear",
                 f"{len(record):,} bp",
                 str(len(components)),
@@ -1024,7 +1114,7 @@ class BatchDesigner:
         # Store for potential machine instruction generation
         self.assembly_groups = assembly_groups
 
-    def generate_epmotion_instructions(self, timestamp: str) -> str:
+    def generate_epmotion_instructions(self, output_prefix: str, timestamp: str) -> str:
         """Generate instructions for the epMotion liquid handling robot.
         
         Creates a CSV file containing transfer instructions for primers and templates
@@ -1039,6 +1129,7 @@ class BatchDesigner:
         R_Primer, R_Plate, R_Well, Template, Size, Repeat]
         
         Args:
+            output_prefix: Path prefix for output files (same as human instructions)
             timestamp (str): Timestamp for file naming
             
         Returns:
@@ -1113,16 +1204,17 @@ class BatchDesigner:
                         ""  # Name (empty)
                     ])
         
-        # Save instructions to CSV
-        output_file = self.instructions_folder / f"{timestamp}_epmotion_instructions.csv"
+        # Save instructions to CSV in same location as human instructions
+        output_file = f"{output_prefix}_epmotion_{timestamp}.csv"
         with open(output_file, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerows(epmotion_instructions)
-        
+
+        self.console.print(f"\n[green]epMotion instructions saved to: {output_file}[/green]")
         return str(output_file)
     
-    def generate_janus_instructions(self, timestamp: str) -> str:
-        """"Generate instructions for the Janus liquid handling robot
+    def generate_janus_instructions(self, output_prefix: str, timestamp: str) -> str:
+        """"Generate instructions for the Janus liquid handling robot   
         
         Creates a CSV file containing transfer instructions for primers and templates
         formatted specifically for the Janus robot. The instructions include:
@@ -1132,9 +1224,11 @@ class BatchDesigner:
         - Template transfers
         
         Column order in human_instructions:
-        ['','Asp plate', 'Asp Pos', 'Vol', 'Disp plate', 'Disp Pos']
+        ['construct_id', 'asperate_plate', 'asperate_well', 'destination_plate',
+        'destination_well', 'transfer_volume']
         
         Args:
+        output_prefix: Path prefix for output files (same as human instructions)
             timestamp (str): Timestamp for file naming
             
         Returns:
@@ -1206,13 +1300,14 @@ class BatchDesigner:
                         '1',       # volume in µL
                     ])
         
-        # Save instructions to CSV
-        output_file = self.instructions_folder / f"{timestamp}_worklist.csv"
-        with open(output_file, 'w', newline='') as f:
+        # Save instructions in same location as human instructions
+        janus_file = f"{output_prefix}_worklist_{timestamp}.csv"
+        with open(janus_file, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerows(janus_instructions)
-        
-        return str(output_file)
+
+        self.console.print(f"\n[green]Worklist saved to: {janus_file}[/green]")
+        return str(janus_file)
         
     
     def _get_template_position(self, template_name: str) -> Tuple[Optional[str], Optional[str]]:
@@ -1274,11 +1369,12 @@ class BatchDesigner:
         self.console.print(f"[yellow]Warning: Template {template_name} not found in any mapping files[/yellow]")
         return None, None
 
-    def generate_machine_assembly_instructions(self, machine_type: str, timestamp: str) -> str:
+    def generate_machine_assembly_instructions(self, output_prefix: str, machine_type: str, timestamp: str) -> str:
         """Generate machine instructions for combining PCR products into final assemblies.
         
         Args:
             machine_type: Type of liquid handling machine (e.g., 'epmotion')
+            output_prefix: Path prefix for output files (same as human instructions)
             timestamp: Timestamp for file naming
             
         Returns:
@@ -1335,13 +1431,14 @@ class BatchDesigner:
                         ""              # Name (empty)
                     ])
             
-            # Save instructions
-            assembly_file = self.instructions_folder / f"{timestamp}_assembly_epmotion_instructions.csv"
+            # Save instructions in same location as human instructions
+            assembly_file = f"{output_prefix}_assembly_epmotion_{timestamp}.csv"
             with open(assembly_file, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerows(instructions)
-                
-            return str(assembly_file)
+
+            self.console.print(f"\n[green]epMotion assembly instructions saved to: {assembly_file}[/green]")
+            return str(assembly_file)   
                 
         if machine_type.lower() == 'janus' or machine_type.lower() == 'hamilton': 
             # Create janus format instructions
@@ -1365,10 +1462,55 @@ class BatchDesigner:
                         "2",                       # Volume in µL (typical for yeast assembly)
                     ])
             
-            # Save instructions
-            assembly_file = self.instructions_folder / f"{timestamp}_assembly_worlist.csv"
+            # Save instructions in same location as human instructions
+            assembly_file = f"{output_prefix}_worklist_{timestamp}.csv"
             with open(assembly_file, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerows(instructions)
-                
-            return str(assembly_file)
+
+            self.console.print(f"\n[green]Worklist saved to: {assembly_file}[/green]")
+            return str(assembly_file)  
+
+    def save_input_record(self, output_prefix: str) -> None:
+        """Save a record of input constructs to file for future reference.
+        
+        Args:
+            output_prefix: Path prefix for output files
+        """
+        if not self.selected_constructs:
+            self.console.print("[yellow]No constructs to record[/yellow]")
+            return
+        
+        # Create table data showing what was selected
+        input_data = []
+        for name, record in self.selected_constructs.items():
+            source = record.annotations.get('source_folder', 'output/')
+            source_type = record.annotations.get('source_type', 'unknown')
+            topology = record.annotations.get('topology', '').lower()
+            
+            # Count components
+            component_count = sum(1 for f in record.features if f.type == "misc_feature")
+            
+            input_data.append([
+                name,
+                source_type,
+                source,
+                topology,
+                f"{len(record)} bp",
+                f"{component_count} components"
+            ])
+        
+        # Save to file
+        inputs_file = f"{output_prefix}_inputs.txt"
+        with open(inputs_file, 'w') as f:
+            f.write("Batch Assembly Input Record\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Selected constructs: {len(self.selected_constructs)}\n\n")
+            f.write(tabulate(
+                input_data,
+                headers=["Name", "Type", "Source Folder", "Topology", "Length", "Components"],
+                tablefmt="grid"
+            ))
+        
+        self.console.print(f"[green]Input record saved to: {inputs_file}[/green]")         
