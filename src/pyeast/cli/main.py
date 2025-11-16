@@ -56,8 +56,10 @@ def get_output_prefix() -> Path:
     
     This function:
     1. Asks user for a name
-    2. Creates a subfolder in output/ with that name
-    3. Returns a Path object: output/name/name
+    2. Checks if a subfolder already exists with that name
+    3. If it exists, warns user and asks for confirmation to overwrite
+    4. Creates a subfolder in output/ with that name
+    5. Returns a Path object: output/name/name
     
     Example:
         If user inputs "my_construct", this returns:
@@ -88,7 +90,10 @@ def get_output_prefix() -> Path:
             if not user_input:
                 console.print("[red]Please enter a name[/red]")
                 continue
-                
+            
+            # Replace spaces with underscores first
+            user_input = user_input.replace(" ", "_")
+
             # Remove any path separators and other invalid filename characters
             # Keep alphanumeric, hyphens, underscores
             safe_name = "".join(c for c in user_input if c not in r'\/.:*?"<>|')
@@ -97,8 +102,30 @@ def get_output_prefix() -> Path:
                 console.print("[red]Invalid name after removing special characters[/red]")
                 continue
             
-            # Create subfolder for this output
+            # Check if subfolder already exists
             output_subfolder = output_dir / safe_name
+            
+            if output_subfolder.exists():
+                # List files in the existing directory
+                existing_files = list(output_subfolder.glob("*"))
+                
+                console.print(f"\n[yellow]Warning: Directory '{safe_name}' already exists[/yellow]")
+                if existing_files:
+                    console.print(f"[yellow]It contains {len(existing_files)} file(s):[/yellow]")
+                    # Show first few files
+                    for file in existing_files[:5]:
+                        console.print(f"[dim]  - {file.name}[/dim]")
+                    if len(existing_files) > 5:
+                        console.print(f"[dim]  ... and {len(existing_files) - 5} more[/dim]")
+                
+                # Ask user if they want to overwrite
+                if not click.confirm("\nOverwrite existing experiment?"):
+                    console.print("[yellow]Please choose a different name[/yellow]")
+                    continue
+                
+                console.print("[yellow]Proceeding with overwrite...[/yellow]")
+            
+            # Create subfolder (or use existing one)
             output_subfolder.mkdir(exist_ok=True)
             
             console.print(f"[dim]Files will be saved to: {output_subfolder}/[/dim]")
@@ -109,6 +136,7 @@ def get_output_prefix() -> Path:
             
         except KeyboardInterrupt:
             raise click.Abort()
+
 
 
 def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> None:
