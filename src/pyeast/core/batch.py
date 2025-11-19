@@ -76,7 +76,7 @@ class BatchDesigner:
                 ['', '', '', '', '', '', '', ''],
                 ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
             ]
-    JANUS_HEADER = [['construct_id', 'asperate_well', 'destination_plate', 'destination_well', 'transfer_volume']]
+    JANUS_HEADER = [['construct_id', 'asperate_plate', 'asperate_well', 'destination_plate', 'destination_well', 'transfer_volume']]
     
     def __init__(self,
                  reuse_limit = 5,
