@@ -1463,7 +1463,7 @@ class BatchDesigner:
                     ])
             
             # Save instructions in same location as human instructions
-            assembly_file = f"{output_prefix}_worklist_{timestamp}.csv"
+            assembly_file = f"{output_prefix}_assembly_worklist_{timestamp}.csv"
             with open(assembly_file, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerows(instructions)
