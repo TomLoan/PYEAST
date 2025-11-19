@@ -76,7 +76,7 @@ class BatchDesigner:
                 ['', '', '', '', '', '', '', ''],
                 ['Barcode ID', 'Labware', 'Source', 'Labware', 'Destination', 'Volume', 'Tool', 'Name']
             ]
-    JANUS_HEADER = [['construct_id', 'asperate_well', 'destination_plate', 'destination_well', 'transfer_volume']]
+    JANUS_HEADER = [['construct_id', 'asperate_plate', 'asperate_well', 'destination_plate', 'destination_well', 'transfer_volume']]
     
     def __init__(self,
                  reuse_limit = 5,
@@ -1463,7 +1463,7 @@ class BatchDesigner:
                     ])
             
             # Save instructions in same location as human instructions
-            assembly_file = f"{output_prefix}_worklist_{timestamp}.csv"
+            assembly_file = f"{output_prefix}_assembly_worklist_{timestamp}.csv"
             with open(assembly_file, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerows(instructions)
