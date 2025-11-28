@@ -1,7 +1,8 @@
 [![DOI](https://zenodo.org/badge/946400824.svg)](https://doi.org/10.5281/zenodo.15393309)
 
-# Set of tools for yeast cloning, built on the CSIRO uv-python template. 
+# PYEAST v1.1.0
 
+## Set of tools for yeast cloning, built on the CSIRO uv-python template. 
 ## Quick start:
 
 ### Prerequisites
@@ -48,7 +49,7 @@ batch: regenate instructions files for previously designed tar and integrate com
 For more details see our [pre-print](https://doi.org/10.1101/2025.05.19.655004) on BioRxiv 
 
 
-## Version 1.1 Adds support for other liquid handlering robots and for MoClo Golden gate assemblies. 
+## Version 1.1 Adds support for other liquid handling robots and for MoClo Golden gate assemblies. 
 
 The following Kits come preloaded: 
 - Yeast ToolKit: [Addgene](https://www.addgene.org/kits/moclo-ytk/) from [Lee at al, 2015](http://doi.org/10.1021/sb500366v)
@@ -61,5 +62,5 @@ New components can be added to any oy these kits by saving a fasta file to .data
 
 To add new golden gate kits save fasta files describing the parts to a new folder in data/component libraries and the lvl 0 plasmids saved in a plasmids subfolder in the same directory. For liquid handling it is often simpliest to save a new 96 plate in .data/templates/TemPlates.xlsx as a new sheet. Be sure the positions of these plasmids are accurate. 
 
-Private Data Support (New in v1.1)
+#### Private Data Support (New in v1.1)
 PYEAST now supports private data directories for proprietary sequences, primers, and templates. Create data/private/component_libraries/ and add your files - PYEAST automatically searches both public and private locations. See data/README.md for details.
