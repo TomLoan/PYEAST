@@ -135,9 +135,11 @@ def design_primers(sequence, target_tm, tolerance=3):
     r_primer = adjust_primer(Seq(sequence[-50:]), False)
     return f_primer, r_primer
 
-def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[str, List], Tuple[Dict[str, List]]]:
+def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[str, List], Dict[str, List]]:
     """
-    Locate primers in IDT spec sheets within the specified directory.
+    Locate primers in IDT spec sheets within both public and private directories.
+    Combines results from both locations - if a primer is found in multiple plates
+    (public or private), all locations are returned for rationalization.
 
     This function searches for primers in Excel files containing IDT specifications.
     It returns two dictionaries: one for found primers and one for missing primers.
@@ -147,54 +149,60 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
         directory (str): The directory path containing IDT spec sheets.
 
     Returns:
-        Tuple[Dict[str, List], Tuple[Dict[str, List]]]: A tuple containing two dictionaries:
+        Tuple[Dict[str, List], Dict[str, List]]: A tuple containing two dictionaries:
             - primers_found: Mapping of primer names to lists of matching locations.
             - primers_missing: Mapping of primer names to lists of missing primer information.
     """
+    from pathlib import Path
+    
     primers_found = {}
     primers_missing = {}
     
-    for spec_sheet in os.listdir(directory):
-        if spec_sheet.endswith('.xlsx'):
-            df = pd.read_excel(os.path.join(directory, spec_sheet), header=0)
-            if len(df.columns) == 4 and all(col in df.columns for col in ['Plate or Box ID', 'Position', 'Sequence Name', 'Sequence']):
-                df['Sequence'] = df['Sequence'].str.replace(" ", "").str.strip()
-                
-                for name, sequence in primers.items():
-                    str_sequence = str(sequence)
-                    matching_rows = df[df['Sequence'].str.upper() == str_sequence.upper()]
+    # Convert to Path for easier manipulation
+    public_dir = Path(directory)
+    
+    # Construct private directory path
+    try:
+        relative_path = public_dir.relative_to("data")
+        private_dir = Path("data/private") / relative_path
+    except ValueError:
+        private_dir = Path("data/private") / public_dir.name
+    
+    # Search both public and private directories for Excel files
+    for search_dir in [public_dir, private_dir]:
+        if not search_dir.exists():
+            continue
+            
+        for spec_sheet in os.listdir(search_dir):
+            if spec_sheet.endswith('.xlsx'):
+                df = pd.read_excel(search_dir / spec_sheet, header=0)
+                if len(df.columns) == 4 and all(col in df.columns for col in ['Plate or Box ID', 'Position', 'Sequence Name', 'Sequence']):
+                    df['Sequence'] = df['Sequence'].str.replace(" ", "").str.strip()
                     
+                    for name, sequence in primers.items():
+                        str_sequence = str(sequence)
+                        matching_rows = df[df['Sequence'].str.upper() == str_sequence.upper()]
+                        
+                        if not matching_rows.empty:
+                            if name not in primers_found:
+                                primers_found[name] = []
+                            
+                            primers_found[name].append({
+                                'Location': matching_rows["Plate or Box ID"].iloc[0],
+                                'Position': matching_rows["Position"].iloc[0],
+                                'sequence': sequence
+                            })
 
-                    
-                    if not matching_rows.empty:
-                        if name not in primers_found:
-                            primers_found[name] = []
-                        # elif name in primers_found:
-                        #     if sequence != primers_found[name]: 
-                        #         print("""Warning, two primers with the same name and different sequences detected
-                        #               This will cause issues in the batching process, run these constructs in different batches""")
-                        primers_found[name].append({
-                            'Location': matching_rows["Plate or Box ID"].iloc[0],
-                            'Position': matching_rows["Position"].iloc[0],
-                            'sequence': sequence
-                        }) 
-
-                
-
+    # Add any primers not found in either location to missing primers
     for name, sequence in primers.items():
         if name not in primers_found:
-            
             primers_missing[name] = []
             primers_missing[name].append({
-                'Location' : 'N/A', 
-                'Position' : 'N/A',
-                'sequence' : sequence
-            }) 
-                
-            
-    #print(primers_found) 
-    #print("\n") 
-    #print(primers_missing)
+                'Location': 'N/A', 
+                'Position': 'N/A',
+                'sequence': sequence
+            })
+    
     return primers_found, primers_missing
 
 

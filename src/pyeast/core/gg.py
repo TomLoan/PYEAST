@@ -267,27 +267,51 @@ class ggDesigner:
 
 
     def get_plasmid_names(self) -> List[str]:  
-        """this will map the sequences in self.assembly_sequences onto plasmids containing those sequences
-        in the speficied directory, sets self.plasmid_names = list[str] doe dnacauldron 
-        assembly
+        """Map sequences to plasmids containing those sequences.
         
-        Args: 
-            plasmid_folder: Path to a directory containing level 0 plasmid files
+        Searches for plasmids in both public and private plasmid directories.
+        Sets self.plasmid_names for dnacauldron assembly.
+        
         Returns: 
             List[str] of plasmid filenames (not paths) for dnacauldron assembly 
         Raises: 
             ValueError: If no assemblies have been selected
-            FileNotFoundError: If plasmid folder doesn't exist
+            FileNotFoundError: If no plasmid folder exists
             RuntimeError: If parts cannot be mapped to plasmids
         """
         if not hasattr(self, 'assemblies_names') or not self.assemblies_names: 
-            raise ValueError("No assemblies slected. Please run get_assembly_order first")
+            raise ValueError("No assemblies selected. Please run get_assembly_order first")
         
         if not hasattr(self, 'assemblies_names') or not self.assemblies_names: 
-            raise ValueError("No assembly sequence available. Plaease run get_seq_records first.")
+            raise ValueError("No assembly sequence available. Please run get_seq_records first.")
         
-        if not self.gg_plasmids.exists(): 
-            raise FileNotFoundError(F"Plasmid folder not found {self.gg_plasmids}")
+        # Check both public and private plasmid directories
+        from pathlib import Path
+        public_plasmids = self.gg_plasmids
+        
+        # Construct private plasmids path
+        try:
+            relative_path = public_plasmids.relative_to("data")
+            private_plasmids = Path("data/private") / relative_path
+        except ValueError:
+            private_plasmids = Path("data/private") / public_plasmids.name
+        
+        # Collect plasmid files from both locations
+        plasmid_files = []
+        found_any_dir = False
+        
+        if public_plasmids.exists():
+            found_any_dir = True
+            plasmid_files.extend(list(public_plasmids.glob('*.gb')))
+            plasmid_files.extend(list(public_plasmids.glob('*.gbk')))
+        
+        if private_plasmids.exists():
+            found_any_dir = True
+            plasmid_files.extend(list(private_plasmids.glob('*.gb')))
+            plasmid_files.extend(list(private_plasmids.glob('*.gbk')))
+        
+        if not found_any_dir:
+            raise FileNotFoundError(f"Plasmid folder not found in {public_plasmids} or {private_plasmids}")
         
         # Collect all the unique sequence names from all assemblies 
         all_part_names = set() 
@@ -301,8 +325,6 @@ class ggDesigner:
             
         # Search plasmid files to find which contain each part 
         part_to_plasmid = {}
-        plasmid_files = list(self.gg_plasmids.glob('*.gb')) + list(self.gg_plasmids.glob('*.gbk'))
-
 
         self.console.print(f"[blue]Searching {len(plasmid_files)} plasmid files for part sequences...[/blue]")
 
@@ -356,43 +378,61 @@ class ggDesigner:
         return self.plasmid_names
         
 
-    def gg_assembly(self, assembly_name: str): 
-        """Passes the set of plasmids in self.plasmid_names to dc.Type2RestrictionAssembly with 
-        expected_constructs = len(self.assemblies_names), if there is warnings or errors it will 
-        provide feedback on what went wrong and return the user to the sequence selection stage. 
-        Sets self.final_final = AssemblySimulation object. Note this method doesn't know what the
-        intention of the user is - that's restricted to the selection stage, but will check that 
-        the outcome is roughly as expected. With this method the order of entry won't matter.
+    def gg_assembly(self, assembly_name: str) -> dc.Type2sRestrictionAssembly: 
+        """Pass plasmids to dnacauldron for Golden Gate assembly simulation.
+        
+        Loads plasmids from both public and private directories to create the repository.
+        Sets self.assembly_sim = AssemblySimulation object.
         
         Args: 
-            assembly_name - name for plasmids in output
+            assembly_name: name for plasmids in output
 
         Raises: 
             ValueError: If no plasmids have been set 
             ValueError: If no assemblies have been selected 
             RuntimeError: If assembly simulation fails or produces unexpected results
         """
-
-        #Create repository from all available lvl 0 plasmids 
+        from pathlib import Path
+        from Bio import SeqIO
+        
+        # Construct both public and private plasmid paths
+        public_plasmids = self.gg_plasmids
+        
+        try:
+            relative_path = public_plasmids.relative_to("data")
+            private_plasmids = Path("data/private") / relative_path
+        except ValueError:
+            private_plasmids = Path("data/private") / public_plasmids.name
+        
+        # Create repository and load records from both locations
         repository = dc.SequenceRepository()
-        repository.import_records(
-            folder = str(self.gg_plasmids), 
-            use_file_names_as_ids=False
-        )
+        
+        # Load from public directory if it exists
+        if public_plasmids.exists():
+            repository.import_records(
+                folder=str(public_plasmids), 
+                use_file_names_as_ids=False
+            )
+        
+        # Load from private directory if it exists
+        if private_plasmids.exists():
+            repository.import_records(
+                folder=str(private_plasmids), 
+                use_file_names_as_ids=False
+            )
+        
         self.repository = repository 
         
-        
         # Create Type 2 restriction assembly with the required plasmids 
-        #  not sure if I'll need (all) the state storage for something or not
         assembly = dc.Type2sRestrictionAssembly(
-            parts = self.plasmid_names,
-            name = assembly_name,
-            expected_constructs = len(self.assemblies_names), 
-            max_constructs = len(self.assemblies_names) + 1
+            parts=self.plasmid_names,
+            name=assembly_name,
+            expected_constructs=len(self.assemblies_names), 
+            max_constructs=len(self.assemblies_names) + 1
         )    
         self.assembly = assembly 
 
-        simulation = assembly.simulate(sequence_repository = repository)
+        simulation = assembly.simulate(sequence_repository=repository)
         self.assembly_sim = simulation
 
         self._validate_assembly_results(simulation, assembly)
@@ -540,7 +580,7 @@ class ggDesigner:
                                                             'Tool',
                                                             'Name'
                                                             ]]
-            # Sae output Note I need the csv wirter here - concatenating the header and df produces a misalignment. 
+            # Save output Note I need the csv wirter here - concatenating the header and df produces a misalignment. 
             with open(f"{output_path}/{assembly_name}_epmotion_instructions.csv", 'w', newline='') as f: 
                 writer = csv.writer(f)
                 writer.writerows(header)
@@ -553,7 +593,6 @@ class ggDesigner:
             
             with open(filename, 'w') as f:
                 f.write('Human Assembly Instructions\n')
-                f.write('='*70 + '\n\n')
                 
                 # Group by construct and destination well
                 grouped = instructions_dataframe.groupby(['construct_id', 'destination_well'])
@@ -576,7 +615,12 @@ class ggDesigner:
                     parts_list = first_row['parts']  # Get the full parts list
                     for idx, (_, row) in enumerate(group.iterrows()):
                         plate, well = row['wells']
+                        if plate == None: 
+                            plate = "not found"
+                        if well == None: 
+                            well = "??"
                         part_name = parts_list[idx] if idx < len(parts_list) else 'part'
+                        
                         f.write(f'[ ] {part_name:15s} | {plate:15s} {well:3s} | {volume_per_part} µL\n')
                     
                     # Master mix
@@ -597,6 +641,7 @@ class ggDesigner:
         
         First checks if the template is a contig/chromosome in the genome mapping file,
         then checks the template plates Excel file for individual templates.
+        Searches both public and private template directories.
         
         Args:
             template_name: Name of the template or genome contig to locate
@@ -610,44 +655,57 @@ class ggDesigner:
         Raises:
             FileNotFoundError: If required mapping files aren't found
         """
-        # First check genome mapping file for contigs
-        genome_map_file = self.template_folder / 'genome_well_mapping.tsv'
-        if genome_map_file.exists():
-            try:
-                genome_df = pd.read_csv(genome_map_file, sep='\t')
+        from pathlib import Path
+        
+        # Construct private template directory path
+        private_template_folder = Path("data/private/templates")
+        
+        # Check both public and private genome mapping files
+        for search_dir in [self.template_folder, private_template_folder]:
+            if not search_dir.exists():
+                continue
                 
-                # Search through each row's contig list
-                for _, row in genome_df.iterrows():
-                    contigs = [c.strip() for c in row['Contig_Names'].split(',')]
-                    if template_name in contigs:
-                        return row['Plate'], row['Well_Position']
-                        
-            except Exception as e:
-                self.console.print(f"[yellow]Warning: Error reading genome mapping file: {str(e)}[/yellow]")
-        
-        # If not found in genome mapping, check template plates Excel file
-        template_excel = self.template_folder / 'TemPlates.xlsx'
-        if not template_excel.exists():
-            raise FileNotFoundError(f"Template plate map not found: {template_excel}")
-            
-        try:
-            wb = openpyxl.load_workbook(template_excel)
-            
-            # Search each sheet (plate)
-            for sheet in wb.sheetnames:
-                ws = wb[sheet]
-                for row in range(3, 11):  # Rows 3-10 map to A-H
-                    for col in range(2, 14):  # Columns 2-13 map to 1-12
-                        cell_value = ws.cell(row=row, column=col).value
-                        if cell_value == template_name:
-                            # Convert Excel row/col to plate coordinates
-                            well = f"{chr(row-3+65)}{col-1}"  # Convert 3->A, 4->B, etc.
-                            return sheet, well
+            genome_map_file = search_dir / 'genome_well_mapping.tsv'
+            if genome_map_file.exists():
+                try:
+                    genome_df = pd.read_csv(genome_map_file, sep='\t')
+                    
+                    # Search through each row's contig list
+                    for _, row in genome_df.iterrows():
+                        contigs = [c.strip() for c in row['Contig_Names'].split(',')]
+                        if template_name in contigs:
+                            return row['Plate'], row['Well_Position']
                             
-        except Exception as e:
-            self.console.print(f"[yellow]Warning: Error reading template plate map: {str(e)}[/yellow]")
+                except Exception as e:
+                    self.console.print(f"[yellow]Warning: Error reading genome mapping file: {str(e)}[/yellow]")
         
-        # Template not found in either location
+        # If not found in genome mapping, check template plates Excel files
+        for search_dir in [self.template_folder, private_template_folder]:
+            if not search_dir.exists():
+                continue
+                
+            template_excel = search_dir / 'TemPlates.xlsx'
+            if not template_excel.exists():
+                continue
+                
+            try:
+                wb = openpyxl.load_workbook(template_excel)
+                
+                # Search each sheet (plate)
+                for sheet in wb.sheetnames:
+                    ws = wb[sheet]
+                    for row in range(3, 11):  # Rows 3-10 map to A-H
+                        for col in range(2, 14):  # Columns 2-13 map to 1-12
+                            cell_value = ws.cell(row=row, column=col).value
+                            if cell_value == template_name:
+                                # Convert Excel row/col to plate coordinates
+                                well = f"{chr(row-3+65)}{col-1}"  # Convert 3->A, 4->B, etc.
+                                return sheet, well
+                                
+            except Exception as e:
+                self.console.print(f"[yellow]Warning: Error reading template plate map: {str(e)}[/yellow]")
+        
+        # Template not found in either public or private locations
         self.console.print(f"[yellow]Warning: Template {template_name} not found in any mapping files[/yellow]")
         return None, None
 

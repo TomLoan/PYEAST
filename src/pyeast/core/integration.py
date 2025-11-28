@@ -158,25 +158,34 @@ class IntegrationDesigner:
                     raise KeyboardInterrupt
                 
     def _load_int_sites(self, directory: Path = None) -> Dict[str, Tuple[SeqRecord, SeqRecord]]:
-        """Load integration sites from data/integration sites directory.
+        """Load integration sites from both public and private directories.
         
         Each site should have two sequences: upstream and downstream homology.
         """
         if directory is None:
             directory = Path("data/integration sites")
         
+        # Also check private directory
+        private_dir = Path("data/private/integration sites")
+        
         int_sites = {}
-        if not directory.exists():
+        
+        # Load from both public and private directories
+        for search_dir in [directory, private_dir]:
+            if not search_dir.exists():
+                continue
+                
+            for file_path in search_dir.glob("*.fasta"):
+                records = list(SeqIO.parse(file_path, "fasta"))
+                if len(records) == 2:
+                    site_name = file_path.stem
+                    int_sites[site_name] = (records[0], records[1])
+                else:
+                    self.console.print(f"[yellow]Warning: Skipping {file_path.name} - expected 2 sequences, found {len(records)}[/yellow]")
+        
+        if not int_sites:
             self.console.print(f"[red]Integration sites directory not found: {directory}[/red]")
             raise FileNotFoundError(f"Integration sites directory not found: {directory}")
-            
-        for file_path in directory.glob("*.fasta"):
-            records = list(SeqIO.parse(file_path, "fasta"))
-            if len(records) == 2:
-                site_name = file_path.stem
-                int_sites[site_name] = (records[0], records[1])
-            else:
-                self.console.print(f"[yellow]Warning: Skipping {file_path.name} - expected 2 sequences, found {len(records)}[/yellow]")
             
         return int_sites
     

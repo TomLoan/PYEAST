@@ -1313,8 +1313,10 @@ class BatchDesigner:
     def _get_template_position(self, template_name: str) -> Tuple[Optional[str], Optional[str]]:
         """Find the plate and well position for a given template.
         
-        First checks if the template is a contig/chromosome in the genome mapping file,
-        then checks the template plates Excel file for individual templates.
+        First checks if the template is a contig/chromosome in the genome mapping file
+        to get the genome name, then looks up the genome name in TemPlates.xlsx for position.
+        For non-genome templates, directly searches TemPlates.xlsx.
+        Searches both public and private directories.
         
         Args:
             template_name: Name of the template or genome contig to locate
@@ -1328,44 +1330,68 @@ class BatchDesigner:
         Raises:
             FileNotFoundError: If required mapping files aren't found
         """
-        # First check genome mapping file for contigs
-        genome_map_file = self.template_folder / 'genome_well_mapping.tsv'
-        if genome_map_file.exists():
-            try:
-                genome_df = pd.read_csv(genome_map_file, sep='\t')
+        from pathlib import Path
+        import pandas as pd
+        import openpyxl
+        
+        # Construct private template directory path
+        private_template_folder = Path("data/private/templates")
+        
+        # Step 1: Check if template_name is a contig and get genome name
+        genome_name = None
+        
+        for search_dir in [self.template_folder, private_template_folder]:
+            if not search_dir.exists():
+                continue
                 
-                # Search through each row's contig list
-                for _, row in genome_df.iterrows():
-                    contigs = [c.strip() for c in row['Contig_Names'].split(',')]
-                    if template_name in contigs:
-                        return row['Plate'], row['Well_Position']
+            genome_map_file = search_dir / 'genome_well_mapping.tsv'
+            if genome_map_file.exists():
+                try:
+                    genome_df = pd.read_csv(genome_map_file, sep='\t')
+                    
+                    # Search through each row's contig list
+                    for _, row in genome_df.iterrows():
+                        contigs = [c.strip() for c in row['Contig_Names'].split(',')]
+                        if template_name in contigs:
+                            genome_name = row['Genome_Name']
+                            break
+                    
+                    if genome_name:
+                        break
                         
+                except Exception as e:
+                    self.console.print(f"[yellow]Warning: Error reading genome mapping file: {str(e)}[/yellow]")
+        
+        # Step 2: Look up the template (or genome name) in TemPlates.xlsx
+        # If we found a genome name, search for that; otherwise search for the original template_name
+        search_name = genome_name if genome_name else template_name
+        
+        for search_dir in [self.template_folder, private_template_folder]:
+            if not search_dir.exists():
+                continue
+                
+            template_excel = search_dir / 'TemPlates.xlsx'
+            if not template_excel.exists():
+                continue
+                
+            try:
+                wb = openpyxl.load_workbook(template_excel)
+                
+                # Search each sheet (plate)
+                for sheet in wb.sheetnames:
+                    ws = wb[sheet]
+                    for row in range(3, 11):  # Rows 3-10 map to A-H
+                        for col in range(2, 14):  # Columns 2-13 map to 1-12
+                            cell_value = ws.cell(row=row, column=col).value
+                            if cell_value == search_name:
+                                # Convert Excel row/col to plate coordinates
+                                well = f"{chr(row-3+65)}{col-1}"  # Convert 3->A, 4->B, etc.
+                                return sheet, well
+                                
             except Exception as e:
-                self.console.print(f"[yellow]Warning: Error reading genome mapping file: {str(e)}[/yellow]")
+                self.console.print(f"[yellow]Warning: Error reading template plate map: {str(e)}[/yellow]")
         
-        # If not found in genome mapping, check template plates Excel file
-        template_excel = self.template_folder / 'TemPlates.xlsx'
-        if not template_excel.exists():
-            raise FileNotFoundError(f"Template plate map not found: {template_excel}")
-            
-        try:
-            wb = openpyxl.load_workbook(template_excel)
-            
-            # Search each sheet (plate)
-            for sheet in wb.sheetnames:
-                ws = wb[sheet]
-                for row in range(3, 11):  # Rows 3-10 map to A-H
-                    for col in range(2, 14):  # Columns 2-13 map to 1-12
-                        cell_value = ws.cell(row=row, column=col).value
-                        if cell_value == template_name:
-                            # Convert Excel row/col to plate coordinates
-                            well = f"{chr(row-3+65)}{col-1}"  # Convert 3->A, 4->B, etc.
-                            return sheet, well
-                            
-        except Exception as e:
-            self.console.print(f"[yellow]Warning: Error reading template plate map: {str(e)}[/yellow]")
-        
-        # Template not found in either location
+        # Template not found in either public or private locations
         self.console.print(f"[yellow]Warning: Template {template_name} not found in any mapping files[/yellow]")
         return None, None
 
