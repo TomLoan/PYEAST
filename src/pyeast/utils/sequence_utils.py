@@ -24,6 +24,7 @@ Sequence utilities for PYEAST.
 # ===========================================================================
 
 import os 
+from pathlib import Path
 import io
 import math
 import logging
@@ -43,8 +44,9 @@ from prompt_toolkit.shortcuts import confirm
 
 def load_sequences(directory: str) -> Dict[str, SeqRecord]:
     """
-    Load all sequences from FASTA files in the given directory.
-    Uses the FASTA header as the sequence name.
+    Load all sequences from FASTA files in both public and private directories.
+    Private sequences override public ones if they have the same name.
+    Can handle directories that exist only in public, only in private, or both.
 
     Args:
         directory (str): Path to the directory containing FASTA files.
@@ -53,29 +55,62 @@ def load_sequences(directory: str) -> Dict[str, SeqRecord]:
         Dict[str, Sequence]: Dictionary of loaded sequences.
 
     Raises:
-        FileNotFoundError: If the directory is not found.
+        FileNotFoundError: If neither public nor private directory is found.
     """
     sequences = {}
+    
+    # Convert to Path for easier manipulation
+    public_dir = Path(directory)
+    
+    # Construct private directory path
     try:
-        for filename in os.listdir(directory):
-            if filename.endswith(('.fasta', '.fa', 'fsa')):
-                file_path = os.path.join(directory, filename)
-                for record in SeqIO.parse(file_path, "fasta"): #Change to fasta-person for biopython >= 1.85
-                    name = record.id.split()[0]  # Take first word of the header
-                    sequences[name] = record
-                    #logging.info(f"Loaded sequence: {name} from file: {filename}")
-    except FileNotFoundError:
-        logging.error(f"Directory not found: {directory}")
-        raise
-    except Exception as e:
-        logging.error(f"Error loading sequences: {str(e)}")
-        raise
+        relative_path = public_dir.relative_to("data")
+        private_dir = Path("data/private") / relative_path
+    except ValueError:
+        private_dir = Path("data/private") / public_dir.name
+    
+    # Track if we found at least one directory
+    found_any = False
+    
+    # Load from public directory if it exists
+    if public_dir.exists():
+        found_any = True
+        try:
+            for filename in os.listdir(public_dir):
+                if filename.endswith(('.fasta', '.fa', 'fsa')):
+                    file_path = public_dir / filename
+                    for record in SeqIO.parse(file_path, "fasta"):
+                        name = record.id.split()[0]
+                        sequences[name] = record
+        except Exception as e:
+            logging.error(f"Error loading sequences from {public_dir}: {str(e)}")
+            raise
+    
+    # Load from private directory if it exists (overwrites public if same name)
+    if private_dir.exists():
+        found_any = True
+        try:
+            for filename in os.listdir(private_dir):
+                if filename.endswith(('.fasta', '.fa', 'fsa')):
+                    file_path = private_dir / filename
+                    for record in SeqIO.parse(file_path, "fasta"):
+                        name = record.id.split()[0]
+                        sequences[name] = record
+        except Exception as e:
+            logging.error(f"Error loading sequences from private directory: {str(e)}")
+            raise
+    
+    # If neither directory exists, raise error
+    if not found_any:
+        logging.error(f"Directory not found: {public_dir} (also checked {private_dir})")
+        raise FileNotFoundError(f"Directory not found: {public_dir}")
 
     return sequences
 
 def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]]:
     """
-    Find template matches for given parts in the specified directory.
+    Find template matches for given parts in both public and private directories.
+    Can handle directories that exist only in public, only in private, or both.
 
     This function searches for templates in FASTA or GenBank files that contain
     the sequences of the provided parts.
@@ -88,15 +123,31 @@ def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]
         Dict[str, List[str]]: A dictionary mapping part IDs to lists of matching template IDs.
     """
     templates = {}
+    
+    # Convert to Path for easier manipulation
+    public_dir = Path(directory)
+    
+    # Construct private directory path
+    try:
+        relative_path = public_dir.relative_to("data")
+        private_dir = Path("data/private") / relative_path
+    except ValueError:
+        private_dir = Path("data/private") / public_dir.name
+    
+    # Load templates from both public and private directories
+    for search_dir in [public_dir, private_dir]:
+        if not search_dir.exists():
+            continue
+            
+        for template_file in os.listdir(search_dir):
+            file_path = search_dir / template_file
+            if str(file_path).endswith(('.fasta', '.fsa', '.fa', '.gb', '.gbk')):
+                format_type = "fasta" if str(file_path).endswith(('.fasta', '.fa', '.fsa')) else "genbank"
+                for record in SeqIO.parse(file_path, format_type):
+                    templates[record.name] = record.seq
+    
+    # Find matching templates for each part
     templates_used = {}
-
-    for template_file in os.listdir(directory):
-        file_path = os.path.join(directory, template_file)
-        if file_path.endswith(('.fasta', '.fsa', '.fa', '.gb', '.gbk')):
-            format = "fasta" if file_path.endswith(('.fasta', '.fa','.fsa')) else "genbank"
-            for record in SeqIO.parse(file_path, format):
-                templates[record.name] = record.seq
-
     for part in parts:
         templates_used[part.name] = []
         for template_id, template_seq in templates.items():
@@ -105,7 +156,7 @@ def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]
         
         if not templates_used[part.name]:
             templates_used[part.name] = ["Not found"]
-    #print(templates_used)
+    
     return templates_used
 
 def rationalize_templates(template_dict: Dict[str, List[str]]) -> Dict[str, str]:

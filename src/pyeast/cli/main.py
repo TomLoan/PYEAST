@@ -186,23 +186,37 @@ def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> 
         pass
 
 def get_component_dir() -> Path:
-    """Get component directory with simple autocompletion"""
-    # Default to src/pyeast/data/component libraries
+    """Get component directory with simple autocompletion, including private libraries"""
+    # Check both public and private base directories
     base_dir = Path("data/component libraries")
-    console.print(base_dir)
+    private_base_dir = Path("data/private/component libraries")
     
-    #todo add a private data option
-    # #check for private data and include in the options
-    # private_components = Path("data/private/component libraries")
-    # if private_components.exists(): 
-    #     console.print(private_components)
-
     if not base_dir.exists():
         console.print("[red]Error: Default components directory not found[/red]")
         raise click.Abort()
-        
-    # Create completer from subdirectories
-    subdirs = [d.name for d in base_dir.iterdir() if d.is_dir()] #+ [d.name for d in private_components.iterdir() if d.is_dir()]
+    
+    # Collect subdirectories from both locations
+    subdirs = set()
+    
+    # Add public directories
+    for d in base_dir.iterdir():
+        if d.is_dir():
+            subdirs.add(d.name)
+    
+    # Add private directories (if private base exists)
+    if private_base_dir.exists():
+        for d in private_base_dir.iterdir():
+            if d.is_dir():
+                subdirs.add(d.name)
+    
+    # Convert to sorted list for display
+    subdirs = sorted(list(subdirs))
+    
+    if not subdirs:
+        console.print("[red]No component libraries found[/red]")
+        raise click.Abort()
+    
+    # Create completer
     dir_completer = WordCompleter(subdirs, ignore_case=True)
     
     session = PromptSession()
@@ -221,11 +235,15 @@ def get_component_dir() -> Path:
                 completer=dir_completer
             )
             
-            selected_dir = base_dir / user_input 
-            if selected_dir.exists() and selected_dir.is_dir():
+            # Always return the public path - load_sequences will handle both
+            selected_dir = base_dir / user_input
+            
+            # Verify at least one location exists
+            private_dir = private_base_dir / user_input
+            if selected_dir.exists() or private_dir.exists():
                 return selected_dir
-            else:
-                console.print("[red]Invalid directory selection[/red]")
+            
+            console.print("[red]Invalid directory selection[/red]")
                 
         except KeyboardInterrupt:
             if click.confirm("\nCancel directory selection?"):
@@ -888,7 +906,7 @@ def run_gg_interactive_mode(designer: ggDesigner):
                 
                 # Get an output prefix
                 output_path = get_output_prefix()
-                console.print(output_path)
+                #console.print(output_path)
                 prefix = output_path.name
                 
                 # Convert to SeqRecord objects and map to plasmids
@@ -913,15 +931,15 @@ def run_gg_interactive_mode(designer: ggDesigner):
                 # For Successful assembly ask about saving outputs 
                 console.print("[green]Assembly Successful![/green]")
                 if click.confirm("Save Outputs?"): 
-                    
-                    designer.gg_save_output(output_path)
-                    designer.gg_instructions(output_path, prefix)
+                    console.print(output_path, prefix)
+                    designer.gg_save_output(str(output_path.parent))
+                    designer.gg_instructions(str(output_path.parent), prefix)
                     
                     #Save the input to file for future reference
                     if len(assembly_order) == 1: 
-                        assemblies_file = f'{output_path}/input.txt'
+                        assemblies_file = f'{output_path.parent}/input.txt'
                     elif len(assembly_order) > 1: 
-                        assemblies_file = f'{output_path}/inputs.txt'
+                        assemblies_file = f'{output_path.parent}/inputs.txt'
                     
                     with open(assemblies_file, 'w') as f: 
                         f.write(tabulate(assembly_order))
