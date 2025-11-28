@@ -1,4 +1,5 @@
 [![DOI](https://zenodo.org/badge/946400824.svg)](https://doi.org/10.5281/zenodo.15393309)
+[![Installation Test](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml/badge.svg)](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml)
 
 # Set of tools for yeast cloning, built on the CSIRO uv-python template. 
 
