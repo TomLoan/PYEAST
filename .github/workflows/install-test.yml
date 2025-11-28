@@ -1,0 +1,36 @@
+name: Installation Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-install:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      
+      - name: Verify PyEAST installs and runs
+        run: |
+          uv sync
+          uv run pyeast --help
+          uv run pyeast tar --help
+          uv run pyeast integrate --help
+          uv run pyeast delete --help
+          uv run pyeast replace --help
+          uv run pyeast batch --help
