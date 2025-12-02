@@ -1,18 +1,18 @@
-# Copyright CSIRO 2025. Thomas Loan 
-# See LICENSE for full GpLv2 license. 
+# Copyright CSIRO 2025. Thomas Loan
+# See LICENSE for full GpLv2 license.
 
-# This program is free software: you can redistribute it and/or modify 
-# it under the terms of the GNU General Public License or 
-# (at your option) any later version. 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License or
+# (at your option) any later version.
 
-# This program is distributed in the hope that it will be useful;, 
-# but WITHOUT ANY WARRENTY; without even the implied warranty of 
+# This program is distributed in the hope that it will be useful;,
+# but WITHOUT ANY WARRENTY; without even the implied warranty of
 # MERCHANTABILITY of FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details. 
+# GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc., 
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. 
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 # ===========================================================================
 
@@ -27,37 +27,27 @@ Integration designer for integrations of DNA sequences into the genome of S. cer
 
 from pathlib import Path
 from typing import Dict, List, Tuple
-from Bio.SeqRecord import SeqRecord
-from rich.console import Console
-from rich.table import Table
+
 import click
+from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.shortcuts import confirm
-from Bio.SeqRecord import SeqRecord 
-from Bio import SeqIO
-from Bio.Seq import Seq
+from rich.console import Console
+from rich.table import Table
 
-from ..utils.sequence_utils import (
-    load_sequences,
-    get_templates,
-    rationalize_templates,
-    assemble_parts_linear,
-    write_linear_instructions
-)
-from ..utils.primer_utils import (
-    design_linear_primers,
-    get_primer_locations,
-    rationalize_primers
-)
-from ..utils.visualisation import visualise_genbank, save_figure
+from ..utils.primer_utils import design_linear_primers, get_primer_locations, rationalize_primers
+from ..utils.sequence_utils import assemble_parts_linear, get_templates, load_sequences, rationalize_templates, write_linear_instructions
+
 
 class IntegrationDesigner:
     def __init__(self, homology_length: int = 25):
         self.homology_length = homology_length
         self.console = Console()
         self.session = PromptSession()
-        
+
         # State storage
         self.components = {}
         self.int_sites = {} #all opitoins for integration sites
@@ -75,11 +65,11 @@ class IntegrationDesigner:
         """Load component sequences and integration sites."""
         # Load components
         self.components = load_sequences(components_dir)
-        
+
         # Load integration sites from standard location
         int_sites_dir = Path("data/integration sites")
         self.int_sites = self._load_int_sites(int_sites_dir)
-        
+
         if not self.components:
             raise ValueError("No component sequences found")
         if not self.int_sites:
@@ -104,13 +94,13 @@ class IntegrationDesigner:
                     "\nEnter the names of the components you want to assemble, in order (space-separated): ",
                     completer=component_completer
                 )
-                
+
                 self.console.print(f"Got user input: {user_input}")  # Debug print
-                
+
                 # Get component sequences
                 component_seqs = []
                 for name in user_input.split():
-                    matches = [comp for comp in self.components.keys() 
+                    matches = [comp for comp in self.components.keys()
                             if comp.lower() == name.lower()]
                     if matches:
                         component_seqs.append(self.components[matches[0]])
@@ -125,8 +115,8 @@ class IntegrationDesigner:
                         "\nEnter the name of the integration site: ",
                         completer=int_site_completer
                     )
-                    
-                    matches = [site for site in self.int_sites.keys() 
+
+                    matches = [site for site in self.int_sites.keys()
                             if site.lower() == int_site.lower()]
                     if matches:
                         upstream_seq, downstream_seq = self.int_sites[matches[0]]
@@ -156,7 +146,7 @@ class IntegrationDesigner:
             except KeyboardInterrupt:
                 if confirm("\nCancel selection?"):
                     raise KeyboardInterrupt
-                
+
     def _load_int_sites(self, directory: Path = None) -> Dict[str, Tuple[SeqRecord, SeqRecord]]:
         """Load integration sites from both public and private directories.
         
@@ -164,17 +154,17 @@ class IntegrationDesigner:
         """
         if directory is None:
             directory = Path("data/integration sites")
-        
+
         # Also check private directory
         private_dir = Path("data/private/integration sites")
-        
+
         int_sites = {}
-        
+
         # Load from both public and private directories
         for search_dir in [directory, private_dir]:
             if not search_dir.exists():
                 continue
-                
+
             for file_path in search_dir.glob("*.fasta"):
                 records = list(SeqIO.parse(file_path, "fasta"))
                 if len(records) == 2:
@@ -182,14 +172,14 @@ class IntegrationDesigner:
                     int_sites[site_name] = (records[0], records[1])
                 else:
                     self.console.print(f"[yellow]Warning: Skipping {file_path.name} - expected 2 sequences, found {len(records)}[/yellow]")
-        
+
         if not int_sites:
             self.console.print(f"[red]Integration sites directory not found: {directory}[/red]")
             raise FileNotFoundError(f"Integration sites directory not found: {directory}")
-            
+
         return int_sites
-    
-    def design_integration_primers(self) -> Dict[str, Seq]: 
+
+    def design_integration_primers(self) -> Dict[str, Seq]:
         """Design integration primers with the necesary overhangs
         
         uses the design_linear_primers function from primer_utils to design primers 
@@ -202,10 +192,10 @@ class IntegrationDesigner:
             ValueError: If no sequences have been selected for assembly. 
         """
 
-        if not self.assembly_sequences: 
+        if not self.assembly_sequences:
             raise ValueError("No sequences selected for assembly. Please select sequences first")
-        
-        
+
+
         self.primers = design_linear_primers(
                 self.assembly_sequences[1:-1],  # middle components
                 (self.assembly_sequences[0], self.assembly_sequences[-1]),  # int sites
@@ -213,7 +203,7 @@ class IntegrationDesigner:
                 homology_length=self.homology_length
             )
         return self.primers
-                
+
     def print_sequence_grid(self, sequences: Dict[str, SeqRecord], title: str = "Available Sequences"):
         """Print the available sequences in a grid format.
         
@@ -225,14 +215,14 @@ class IntegrationDesigner:
         table.add_column("Name", style="cyan")
         table.add_column("Length", justify="right", style="green")
         table.add_column("Description", style="white")
-        
+
         for name, seq in sequences.items():
             table.add_row(
                 name,
                 f"{len(seq)} bp",
                 seq.description[:150] + "..." if len(seq.description) > 149 else seq.description
             )
-        
+
         self.console.print(table)
 
     def print_integration_sites(self, sites: Dict[str, Tuple[SeqRecord, SeqRecord]], title: str = "Available Integration Sites"):
@@ -247,7 +237,7 @@ class IntegrationDesigner:
         table.add_column("Up", justify="right", style="green")
         table.add_column("Down", justify="right", style="green")
         table.add_column("Description", style="white")
-        
+
         for name, (up_seq, down_seq) in sites.items():
             table.add_row(
                 name,
@@ -255,10 +245,10 @@ class IntegrationDesigner:
                 f"{len(down_seq)} bp",
                 up_seq.description[:150] + "..." if len(up_seq.description) > 149 else up_seq.description
             )
-        
+
         self.console.print(table)
-    
-    def check_primer_locations(self, primer_folder: Path) -> None: 
+
+    def check_primer_locations(self, primer_folder: Path) -> None:
         """Check for exisiting primers stored in plates
         
         Uses primer locations functions from primer_utils to find exisiting primers in 
@@ -269,13 +259,13 @@ class IntegrationDesigner:
 
         Raises: 
             ValueError: if primers haven't been desinged yet
-        """ 
-        
-        if not self.primers: 
+        """
+
+        if not self.primers:
             raise ValueError("No primers to look for, please design primers first")
-        
+
         self.primers_found, self.missing_primers = get_primer_locations(
-            self.primers, 
+            self.primers,
             str(primer_folder)
         )
 
@@ -295,18 +285,18 @@ class IntegrationDesigner:
         """
         if not self.primers_found and not self.missing_primers:
             raise ValueError("No primer location data. Please check primer locations first.")
-        
+
         if not self.template_dict:
             raise ValueError("No template data. Please find templates first.")
-            
+
         self.rationalized_primers = rationalize_primers(
             self.primers_found,
             self.missing_primers
         )
-        
+
         self.rationalized_templates = rationalize_templates(self.template_dict)
-        
-    
+
+
     def write_instructions(self) -> List[List[str]]:
         """Generate assembly instructions for the TAR cloning experiment.
         
@@ -318,10 +308,10 @@ class IntegrationDesigner:
         """
         if not self.rationalized_primers:
             raise ValueError("No rationalized primer data. Please rationalize selections first.")
-            
+
         if not self.rationalized_templates:
             raise ValueError("No rationalized template data. Please rationalize selections first.")
-        
+
         return write_linear_instructions(
             self.rationalized_primers,
             self.rationalized_templates,
@@ -362,7 +352,7 @@ class IntegrationDesigner:
         table.add_column("Well", style="bold blue")
         table.add_column("Template", style="magenta")
         table.add_column("Size", justify="right")
-        
+
         for line in instructions:
             table.add_row(
                 str(line[0]),  # Part name
@@ -375,7 +365,7 @@ class IntegrationDesigner:
                 str(line[7] if line[7] != "Not found" else "[bold red]Not found[/bold red]"), #Template
                 str(line[8])  # Amplicon Size
             )
-        
+
         self.console.print(table)
 
 
@@ -390,10 +380,10 @@ class IntegrationDesigner:
         """
         if not self.primers:
             raise ValueError("No primers available. Please design primers first.")
-            
+
         if not self.assembly_sequences:
             raise ValueError("No sequences selected. Please select sequences first.")
-            
+
         self.final_assembly = assemble_parts_linear(
             self.assembly_sequences,
             self.primers,

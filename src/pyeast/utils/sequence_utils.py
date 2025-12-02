@@ -1,18 +1,18 @@
-# Copyright CSIRO 2025. Thomas Loan 
-# See LICENSE for full GpLv2 license. 
+# Copyright CSIRO 2025. Thomas Loan
+# See LICENSE for full GpLv2 license.
 
-# This program is free software: you can redistribute it and/or modify 
-# it under the terms of the GNU General Public License or 
-# (at your option) any later version. 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License or
+# (at your option) any later version.
 
-# This program is distributed in the hope that it will be useful;, 
-# but WITHOUT ANY WARRENTY; without even the implied warranty of 
+# This program is distributed in the hope that it will be useful;,
+# but WITHOUT ANY WARRENTY; without even the implied warranty of
 # MERCHANTABILITY of FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details. 
+# GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc., 
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. 
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 # ===========================================================================
 
@@ -23,24 +23,19 @@ Sequence utilities for PYEAST.
 
 # ===========================================================================
 
-import os 
-from pathlib import Path
-import io
-import math
 import logging
-from typing import Dict, List, Tuple, Generator, Optional
-import pandas as pd
+import os
 from collections import Counter
+from collections.abc import Generator
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+from Bio import Align, SeqIO
 from Bio.Seq import Seq
+from Bio.SeqFeature import CompoundLocation, FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
-from Bio import SeqIO, Align 
-from Bio.SeqUtils import MeltingTemp as mt
-from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
-from datetime import date, datetime
-from PIL import Image
-from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.shortcuts import confirm
+
 
 def load_sequences(directory: str) -> Dict[str, SeqRecord]:
     """
@@ -58,20 +53,20 @@ def load_sequences(directory: str) -> Dict[str, SeqRecord]:
         FileNotFoundError: If neither public nor private directory is found.
     """
     sequences = {}
-    
+
     # Convert to Path for easier manipulation
     public_dir = Path(directory)
-    
+
     # Construct private directory path
     try:
         relative_path = public_dir.relative_to("data")
         private_dir = Path("data/private") / relative_path
     except ValueError:
         private_dir = Path("data/private") / public_dir.name
-    
+
     # Track if we found at least one directory
     found_any = False
-    
+
     # Load from public directory if it exists
     if public_dir.exists():
         found_any = True
@@ -85,7 +80,7 @@ def load_sequences(directory: str) -> Dict[str, SeqRecord]:
         except Exception as e:
             logging.error(f"Error loading sequences from {public_dir}: {str(e)}")
             raise
-    
+
     # Load from private directory if it exists (overwrites public if same name)
     if private_dir.exists():
         found_any = True
@@ -99,7 +94,7 @@ def load_sequences(directory: str) -> Dict[str, SeqRecord]:
         except Exception as e:
             logging.error(f"Error loading sequences from private directory: {str(e)}")
             raise
-    
+
     # If neither directory exists, raise error
     if not found_any:
         logging.error(f"Directory not found: {public_dir} (also checked {private_dir})")
@@ -123,29 +118,29 @@ def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]
         Dict[str, List[str]]: A dictionary mapping part IDs to lists of matching template IDs.
     """
     templates = {}
-    
+
     # Convert to Path for easier manipulation
     public_dir = Path(directory)
-    
+
     # Construct private directory path
     try:
         relative_path = public_dir.relative_to("data")
         private_dir = Path("data/private") / relative_path
     except ValueError:
         private_dir = Path("data/private") / public_dir.name
-    
+
     # Load templates from both public and private directories
     for search_dir in [public_dir, private_dir]:
         if not search_dir.exists():
             continue
-            
+
         for template_file in os.listdir(search_dir):
             file_path = search_dir / template_file
             if str(file_path).endswith(('.fasta', '.fsa', '.fa', '.gb', '.gbk')):
                 format_type = "fasta" if str(file_path).endswith(('.fasta', '.fa', '.fsa')) else "genbank"
                 for record in SeqIO.parse(file_path, format_type):
                     templates[record.name] = record.seq
-    
+
     # Find matching templates for each part
     templates_used = {}
     for part in parts:
@@ -153,10 +148,10 @@ def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]
         for template_id, template_seq in templates.items():
             if part.seq.upper() in template_seq.upper() or part.seq.upper() in template_seq.upper().reverse_complement():
                 templates_used[part.name].append(template_id)
-        
+
         if not templates_used[part.name]:
             templates_used[part.name] = ["Not found"]
-    
+
     return templates_used
 
 def rationalize_templates(template_dict: Dict[str, List[str]]) -> Dict[str, str]:
@@ -184,20 +179,20 @@ def rationalize_templates(template_dict: Dict[str, List[str]]) -> Dict[str, str]
     def choose_best_template(templates):
         if not templates or templates[0] == "Not found":
             return "Not found"
-        
+
         # Filter out "Not found" entries
         valid_templates = [t for t in templates if t != "Not found"]
-        
+
         # First, check if any templates are in the preferred list
         preferred_available = [t for t in valid_templates if t in preferred_templates]
         if preferred_available:
             return min(preferred_available, key=lambda x: (preferred_templates.index(x), -template_frequency[x], len(x)))
-        
+
         # If no preferred templates, choose based on frequency and then name length
         return max(valid_templates, key=lambda x: (template_frequency[x], -len(x)))
 
     # Select the best template for each part
-    rationalized_templates = {part: choose_best_template(templates) 
+    rationalized_templates = {part: choose_best_template(templates)
                               for part, templates in template_dict.items()}
 
     return rationalized_templates
@@ -237,21 +232,21 @@ def write_circular_instructions(rationalized_primers: Dict[str, Dict],
     List[List[str]]: List of instruction rows for assembly
     """
     instructions = []
-    
+
     for part in assembly_sequences:
         part_name = part.id
         part_seq = part.seq
-        
+
         # Find matching primers
         f_primer = find_matching_primer(rationalized_primers, part_seq, True, homology_length)
         r_primer = find_matching_primer(rationalized_primers, part_seq, False, homology_length)
-        
+
         # Get template
         template = rationalized_templates.get(part_name, "Not found")
-        
+
         # Calculate amplicon length
         amplicon_length = len(part_seq) + (2 * homology_length)
-        
+
         # Create instruction row
         if f_primer and r_primer:
             instruction = [
@@ -262,9 +257,9 @@ def write_circular_instructions(rationalized_primers: Dict[str, Dict],
                 amplicon_length
             ]
             instructions.append(instruction)
-        else: 
+        else:
             print(f"primer(s) missing for {part_name}")
-    
+
     return instructions
 
 def write_linear_instructions(rationalized_primers: Dict[str, Dict],
@@ -288,25 +283,25 @@ def write_linear_instructions(rationalized_primers: Dict[str, Dict],
     """
     instructions = []
     all_parts = [int_site_up] + middle_sequences + [int_site_down]
-    
+
     for part in all_parts:
         part_name = part.id
         part_seq = part.seq
-        
+
         # Find matching primers
         if part_seq == int_site_up.seq:
             f_primer = find_matching_primer(rationalized_primers, part_seq, True, 0)
             r_primer = find_matching_primer(rationalized_primers, part_seq, False, homology_length)
-        elif part_seq == int_site_down.seq: 
+        elif part_seq == int_site_down.seq:
             f_primer = find_matching_primer(rationalized_primers, part_seq, True, homology_length)
             r_primer = find_matching_primer(rationalized_primers, part_seq, False, 0)
         else:
             f_primer = find_matching_primer(rationalized_primers, part_seq, True, homology_length)
             r_primer = find_matching_primer(rationalized_primers, part_seq, False, homology_length)
-        
+
         # Get template
         template = rationalized_templates.get(part_name, "Not found")
-        
+
         # Calculate amplicon length (accounting for no overhangs on ends)
         if part_seq == int_site_up.seq:
             amplicon_length = len(part_seq) + homology_length  # Only downstream overhang
@@ -314,7 +309,7 @@ def write_linear_instructions(rationalized_primers: Dict[str, Dict],
             amplicon_length = len(part_seq) + homology_length  # Only upstream overhang
         else:
             amplicon_length = len(part_seq) + (2 * homology_length)  # Both overhangs
-        
+
         # Create instruction row
         if f_primer and r_primer:
             instruction = [
@@ -325,7 +320,7 @@ def write_linear_instructions(rationalized_primers: Dict[str, Dict],
                 amplicon_length
             ]
             instructions.append(instruction)
-    
+
     return instructions
 
 def find_matching_primer(primers: Dict[str, Dict], part_seq: Seq, is_forward: bool, homology_length: int) -> Optional[Dict]:
@@ -346,7 +341,7 @@ def find_matching_primer(primers: Dict[str, Dict], part_seq: Seq, is_forward: bo
         primer_seq = info['sequence']
         if not isinstance(primer_seq, Seq):
             primer_seq = Seq(primer_seq)
-        
+
         # Remove homology region from primer
         primer_without_homology = primer_seq[homology_length:]
         check_length = len(primer_without_homology)
@@ -358,7 +353,7 @@ def find_matching_primer(primers: Dict[str, Dict], part_seq: Seq, is_forward: bo
             rev_comp = primer_without_homology.reverse_complement()
             if str(rev_comp) == part_str[-check_length:] and check_length >14:
                 return {**info, 'name': name}
-    
+
     return None
 
 def assemble_parts_circular(parts: List[SeqRecord], primers: Dict[str, Seq], homology_length: int) -> SeqRecord:
@@ -377,7 +372,7 @@ def assemble_parts_circular(parts: List[SeqRecord], primers: Dict[str, Seq], hom
     assembled_sequence = "".join(str(part.seq) for part in parts)
     total_length = len(assembled_sequence)
     circular_sequence = assembled_sequence + assembled_sequence[:50]
-    
+
     features = []
     current_position = 0
 
@@ -396,11 +391,11 @@ def assemble_parts_circular(parts: List[SeqRecord], primers: Dict[str, Seq], hom
     for primer_name, primer_seq in primers.items():
         primer_str = str(primer_seq)
         rc_primer_str = str(Seq(primer_str).reverse_complement())
-        
+
         # Find all occurrences of the primer in the circular sequence
         forward_matches = find_all_occurrences(circular_sequence, primer_str)
         reverse_matches = find_all_occurrences(circular_sequence, rc_primer_str)
-        
+
         # Add features for all forward matches
         for match in forward_matches:
             start = match % total_length
@@ -421,7 +416,7 @@ def assemble_parts_circular(parts: List[SeqRecord], primers: Dict[str, Seq], hom
                     qualifiers={"label": f"{primer_name}_forward"}
                 )
             features.append(primer_feature)
-        
+
         # Add features for all reverse matches
         for match in reverse_matches:
             start = match % total_length
@@ -437,34 +432,34 @@ def assemble_parts_circular(parts: List[SeqRecord], primers: Dict[str, Seq], hom
                     CompoundLocation([
                         FeatureLocation(0, end, strand=-1),
                         FeatureLocation(start, total_length, strand=-1)
-                        
+
                     ]),
                     type="primer_bind",
                     qualifiers={"label": f"{primer_name}_reverse"}
                 )
             features.append(primer_feature)
-        
+
         if not forward_matches and not reverse_matches:
             print(f"Warning: Primer {primer_name} not found in the assembled sequence")
 
     # Check for similar junctions
     junction_length = 100  # 50 bp on either side of the junction
     junctions = []
-    
+
     current_position = 0
     for i, part in enumerate(parts):
         part_length = len(part.seq)
         junction_start = (current_position + part_length - junction_length // 2) % total_length
         junction_end = (junction_start + junction_length) % total_length
-        
+
         if junction_start < junction_end:
             junction_seq = circular_sequence[junction_start:junction_end]
         else:
             junction_seq = circular_sequence[junction_start:]
-        
+
         next_part = parts[(i + 1) % len(parts)]
         junctions.append((junction_seq, f"{part.id}_{i}", f"{next_part.id}_{(i+1)%len(parts)}"))
-        
+
         current_position += part_length
     #print('checking junctions')
     #print(junctions)
@@ -474,7 +469,7 @@ def assemble_parts_circular(parts: List[SeqRecord], primers: Dict[str, Seq], hom
         for j in range(i + 1, len(junctions)):
             seq1, part1, next_part1 = junctions[i]
             seq2, part2, next_part2 = junctions[j]
-            
+
             alignments = Align.PairwiseAligner().align(seq1, seq2)
             best_alignment = alignments[0]
             max_possible_score = min(len(seq1), len(seq2))
@@ -544,7 +539,7 @@ def assemble_parts_linear(parts: List[SeqRecord], primers: Dict[str, Seq]) -> Se
         else:
             feature_type = "misc_feature"
             qualifier = {"label": part.id}
-        
+
         feature = SeqFeature(
             FeatureLocation(current_position, current_position + part_length),
             type=feature_type,
@@ -560,7 +555,7 @@ def assemble_parts_linear(parts: List[SeqRecord], primers: Dict[str, Seq]) -> Se
         forward_pos = assembled_seq_str.find(primer_seq_str)
         reverse_complement = str(primer_seq.reverse_complement())
         reverse_pos = assembled_seq_str.find(reverse_complement)
-        
+
         if forward_pos != -1:
             primer_feature = SeqFeature(
                 FeatureLocation(forward_pos, forward_pos + len(primer_seq), strand=1),
@@ -580,6 +575,6 @@ def assemble_parts_linear(parts: List[SeqRecord], primers: Dict[str, Seq]) -> Se
     assembled_sequence.annotations["molecule_type"] = "DNA"
     assembled_sequence.annotations["topology"] = "linear"
     assembled_sequence.annotations["date"] = datetime.now().strftime("%d-%b-%Y").upper()
-    
+
     return assembled_sequence
 

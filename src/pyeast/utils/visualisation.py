@@ -1,18 +1,18 @@
-# Copyright CSIRO 2025. Thomas Loan 
-# See LICENSE for full GpLv2 license. 
+# Copyright CSIRO 2025. Thomas Loan
+# See LICENSE for full GpLv2 license.
 
-# This program is free software: you can redistribute it and/or modify 
-# it under the terms of the GNU General Public License or 
-# (at your option) any later version. 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License or
+# (at your option) any later version.
 
-# This program is distributed in the hope that it will be useful;, 
-# but WITHOUT ANY WARRENTY; without even the implied warranty of 
+# This program is distributed in the hope that it will be useful;,
+# but WITHOUT ANY WARRENTY; without even the implied warranty of
 # MERCHANTABILITY of FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details. 
+# GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc., 
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. 
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 # ===========================================================================
 
@@ -27,12 +27,15 @@ DNA visualisation tools for PYEAST.
 
 
 import matplotlib
+
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from dna_features_viewer import GraphicFeature, CircularGraphicRecord, GraphicRecord
-from Bio import SeqIO
-from io import BytesIO
 import itertools
+from io import BytesIO
+
+import matplotlib.pyplot as plt
+from Bio import SeqIO
+from dna_features_viewer import CircularGraphicRecord, GraphicFeature, GraphicRecord
+
 
 def visualise_genbank(gb_file_path):
     """
@@ -62,23 +65,23 @@ def visualise_genbank(gb_file_path):
             start = int(feature.location.start)
             end = int(feature.location.end)
             strand = feature.location.strand
-            
-            label = (feature.qualifiers.get("label", []) or 
-                     feature.qualifiers.get("gene", []) or 
-                     feature.qualifiers.get("product", []) or 
+
+            label = (feature.qualifiers.get("label", []) or
+                     feature.qualifiers.get("gene", []) or
+                     feature.qualifiers.get("product", []) or
                      [f"{feature.type}_{start}-{end}"])[0]
-            
+
             color = next(color_cycle)
-            
+
             features.append(GraphicFeature(
-                start=start, end=end, strand=strand, 
+                start=start, end=end, strand=strand,
                 color=color, label=label
             ))
 
     # Create the graphic record
     if record.annotations['topology'] == 'circular':
         graphic_record = CircularGraphicRecord(sequence_length=len(record.seq), features=features, top_position=1, labels_spacing=1500)
-    else: 
+    else:
         graphic_record = GraphicRecord(sequence_length=len(record.seq), features=features)
 
     # Plot the graphic record
