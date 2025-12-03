@@ -1,18 +1,18 @@
-# Copyright CSIRO 2025. Thomas Loan 
-# See LICENSE for full GpLv2 license. 
+# Copyright CSIRO 2025. Thomas Loan
+# See LICENSE for full GpLv2 license.
 
-# This program is free software: you can redistribute it and/or modify 
-# it under the terms of the GNU General Public License or 
-# (at your option) any later version. 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License or
+# (at your option) any later version.
 
-# This program is distributed in the hope that it will be useful;, 
-# but WITHOUT ANY WARRENTY; without even the implied warranty of 
+# This program is distributed in the hope that it will be useful;,
+# but WITHOUT ANY WARRENTY; without even the implied warranty of
 # MERCHANTABILITY of FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details. 
+# GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc., 
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. 
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 # ===========================================================================
 
@@ -28,24 +28,15 @@ Primer utilities for PYEAST.
 
 
 
-import os 
-import io
-import math
-import logging
-from typing import Dict, List, Tuple, Generator, Optional
+import os
+from typing import Dict, List, Tuple
+
 import pandas as pd
-from collections import Counter
 import primer3
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from Bio import SeqIO, Align 
 from Bio.SeqUtils import MeltingTemp as mt
-from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
-from datetime import date, datetime
-from PIL import Image
-from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.shortcuts import confirm
+
 
 def design_screening_primers(sequence, target_start, target_end, primer_length=20, product_size_range=(500,1000)):
     """
@@ -92,7 +83,7 @@ def design_screening_primers(sequence, target_start, target_end, primer_length=2
     except Exception as e:
         print(f"An unexpected error occurred: {str(e)}")
         return None, None, None
-    
+
 
 def design_primers(sequence, target_tm, tolerance=3):
     """
@@ -109,7 +100,7 @@ def design_primers(sequence, target_tm, tolerance=3):
             primer = seq
         else:
             primer = seq.reverse_complement()
-            
+
         while abs(mt.Tm_NN(primer) - target_tm) > tolerance:
             current_tm = mt.Tm_NN(primer)
             if current_tm > target_tm:
@@ -124,11 +115,11 @@ def design_primers(sequence, target_tm, tolerance=3):
                     # Add one more base from original sequence for reverse primer
                     new_length = len(primer) + 1
                     primer = seq[-new_length:].reverse_complement()
-                    
+
             # Safety check to prevent infinite loop
             if len(primer) < 16 or len(primer) > len(seq):
                 break
-                
+
         return primer
 
     f_primer = adjust_primer(Seq(sequence[:50]), True)
@@ -154,39 +145,39 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
             - primers_missing: Mapping of primer names to lists of missing primer information.
     """
     from pathlib import Path
-    
+
     primers_found = {}
     primers_missing = {}
-    
+
     # Convert to Path for easier manipulation
     public_dir = Path(directory)
-    
+
     # Construct private directory path
     try:
         relative_path = public_dir.relative_to("data")
         private_dir = Path("data/private") / relative_path
     except ValueError:
         private_dir = Path("data/private") / public_dir.name
-    
+
     # Search both public and private directories for Excel files
     for search_dir in [public_dir, private_dir]:
         if not search_dir.exists():
             continue
-            
+
         for spec_sheet in os.listdir(search_dir):
             if spec_sheet.endswith('.xlsx'):
                 df = pd.read_excel(search_dir / spec_sheet, header=0)
                 if len(df.columns) == 4 and all(col in df.columns for col in ['Plate or Box ID', 'Position', 'Sequence Name', 'Sequence']):
                     df['Sequence'] = df['Sequence'].str.replace(" ", "").str.strip()
-                    
+
                     for name, sequence in primers.items():
                         str_sequence = str(sequence)
                         matching_rows = df[df['Sequence'].str.upper() == str_sequence.upper()]
-                        
+
                         if not matching_rows.empty:
                             if name not in primers_found:
                                 primers_found[name] = []
-                            
+
                             primers_found[name].append({
                                 'Location': matching_rows["Plate or Box ID"].iloc[0],
                                 'Position': matching_rows["Position"].iloc[0],
@@ -198,11 +189,11 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
         if name not in primers_found:
             primers_missing[name] = []
             primers_missing[name].append({
-                'Location': 'N/A', 
+                'Location': 'N/A',
                 'Position': 'N/A',
                 'sequence': sequence
             })
-    
+
     return primers_found, primers_missing
 
 
@@ -222,31 +213,31 @@ def rationalize_primers(primers_found: Dict[str, List],  primers_missing : Dict[
     """
     plate_count = {}
     #Count how frequently each plate/box appears across all plates/boxes with matching primers
-    for primer in primers_found: 
+    for primer in primers_found:
         #print(primer)
         matches = primers_found[primer]
         #print(matches)
-        for match in matches: 
+        for match in matches:
             #print(match)
             plate = match['Location']
             #print(plate)
-            if plate in plate_count: 
-                plate_count[plate] +=1 
-            else: 
+            if plate in plate_count:
+                plate_count[plate] +=1
+            else:
                 plate_count[plate] = 1
 
-            
+
     #Select primers from the plates that appear most frequently
     selected_primers = {}
-    for primer in primers_found: 
-        matches = primers_found[primer] 
+    for primer in primers_found:
+        matches = primers_found[primer]
         valid_plates = [match['Location'] for match in matches]
-        
-        if valid_plates: 
+
+        if valid_plates:
             best_plate = max(valid_plates, key=lambda x: plate_count[x])
             best_match = next(match for match in matches if match['Location'] == best_plate)
             selected_primers[primer] = best_match
-    
+
     for primer_name, primer_info_list in primers_missing.items():
         selected_primers[primer_name] = primer_info_list[0]
 
@@ -299,7 +290,7 @@ def design_circular_primers(parts: List[SeqRecord], target_tm=50, overhang_lengt
     primers = {}
     for i, part in enumerate(parts):
         part_name = f"{part.id}_{i}"  # Use a unique identifier for each part
-        
+
         f_primer, r_primer = design_primers(str(part.seq), target_tm)
         primers[f"{part_name}F"] = f_primer
         primers[f"{part_name}R"] = r_primer
@@ -349,7 +340,7 @@ def add_linear_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], int_si
 
     return oh_oligos
 
-def design_linear_primers(components: List[SeqRecord], int_site: Tuple[SeqRecord, SeqRecord], 
+def design_linear_primers(components: List[SeqRecord], int_site: Tuple[SeqRecord, SeqRecord],
                                target_tm: float, homology_length: int) -> Dict[str, Seq]:
     """
     Design primers for integrating components at a specific site.

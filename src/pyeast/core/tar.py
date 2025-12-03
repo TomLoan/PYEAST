@@ -1,18 +1,18 @@
-# Copyright CSIRO 2025. Thomas Loan 
-# See LICENSE for full GpLv2 license. 
+# Copyright CSIRO 2025. Thomas Loan
+# See LICENSE for full GpLv2 license.
 
-# This program is free software: you can redistribute it and/or modify 
-# it under the terms of the GNU General Public License or 
-# (at your option) any later version. 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License or
+# (at your option) any later version.
 
-# This program is distributed in the hope that it will be useful;, 
-# but WITHOUT ANY WARRENTY; without even the implied warranty of 
+# This program is distributed in the hope that it will be useful;,
+# but WITHOUT ANY WARRENTY; without even the implied warranty of
 # MERCHANTABILITY of FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details. 
+# GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc., 
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. 
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 # ===========================================================================
 
@@ -25,40 +25,27 @@ Transformation Assisted Recombinaiton (TAR) toolkit for plasmid assembly in S. c
 
 
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-from Bio.SeqRecord import SeqRecord 
-from Bio.Seq import Seq
-from rich.console import Console
-from rich.table import Table
-from rich.progress import Progress
+from typing import Dict, List, Tuple
+
 import click
-from prompt_toolkit import PromptSession 
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.shortcuts import confirm
-import io
-from PIL import Image
+from rich.console import Console
+from rich.table import Table
 
-from ..utils.sequence_utils import (
-    load_sequences,
-    get_templates, 
-    rationalize_templates, 
-    write_circular_instructions, 
-    assemble_parts_circular
-) 
-                                    
 from ..utils.primer_utils import (
-    design_circular_primers, 
-    get_primer_locations, 
-    rationalize_primers, 
-
+    design_circular_primers,
+    get_primer_locations,
+    rationalize_primers,
 )
+from ..utils.sequence_utils import assemble_parts_circular, get_templates, load_sequences, rationalize_templates, write_circular_instructions
 
-from ..utils.visualisation import visualise_genbank, save_figure
 
-
-class TARDesigner: 
+class TARDesigner:
     """A class for designing TAR experiments . 
     
     This class handles the design of primers and assembly 
@@ -66,16 +53,16 @@ class TARDesigner:
     in Sacharomyces cerevisiae. 
     """
 
-    def __init__(self, homology_length: int = 25, annealing_temp: float = 50): 
+    def __init__(self, homology_length: int = 25, annealing_temp: float = 50):
         """Inintialise a new TARDesigner. 
         
         Args:
             homology_length: Length of homology regions to be added to primers (default: 25) 
             annealing_temp: Target annealing temperature for primer design (default: 50)
             """
-        
-        self.homology_length = homology_length 
-        self.annealing_temp = annealing_temp 
+
+        self.homology_length = homology_length
+        self.annealing_temp = annealing_temp
         self.console = Console()
         self.session = PromptSession()
 
@@ -90,7 +77,7 @@ class TARDesigner:
         self.final_assembled_sequence = None    # Final assembled sequence
 
 
-    def load_and_get_sequences(self, directory: Path) -> None: 
+    def load_and_get_sequences(self, directory: Path) -> None:
         """"Loads seqeunces from a directory and store them for assembly. 
         
         Args: 
@@ -99,21 +86,21 @@ class TARDesigner:
             """
         self.available_sequences = load_sequences(directory)
         return self.available_sequences
-    
+
     def get_assembly_order(self, sequences: Dict[str, SeqRecord]) -> List[str]:
         """Get assembly order from user with autocomplete"""
         sequence_completer = WordCompleter(sequences.keys(), ignore_case=True)
-        
+
         while True:
             try:
                 self.console.print("\n[blue]Enter sequences to assemble (space-separated)[/blue]")
                 self.console.print("[dim]Use TAB for autocompletion[/dim]")
-                
+
                 user_input = self.session.prompt(
                     "Sequences: ",
                     completer=sequence_completer
                 )
-                
+
                 selected = user_input.split()
                 if not selected:
                     self.console.prinpt("[yellow]No sequences selected[/yellow]")
@@ -132,7 +119,7 @@ class TARDesigner:
 
                 if click.confirm("\nProceed with these sequences?"):
                     return selected
-                
+
             except KeyboardInterrupt:
                 if confirm("\nDo you want to exit?"):
                     return None
@@ -150,7 +137,7 @@ class TARDesigner:
         table.add_column("Well", style="bold blue")
         table.add_column("Template", style="magenta")
         table.add_column("Size", justify="right")
-        
+
         for line in instructions:
             table.add_row(
                 str(line[0]),  # Part name
@@ -163,33 +150,33 @@ class TARDesigner:
                 str(line[7] if line[7] != "Not found" else "[bold red]Not found[/bold red]"), #Template
                 str(line[8])  # Amplicon Size
             )
-        
+
         self.console.print(table)
-    
+
     def print_sequence_grid(self, sequences: dict, title: str = "Available Sequences"):
         """Display available sequences in a formatted table"""
         table = Table(title=title)
         table.add_column("Name", style="cyan")
         table.add_column("Length", justify="right", style="green")
         table.add_column("Description", style="white")
-        
+
         for name, seq in sequences.items():
             table.add_row(
                 name,
                 f"{len(seq)} bp",
                 seq.description[:150] + "..." if len(seq.description) > 149 else seq.description
             )
-        
+
         self.console.print(table)
 
-    def set_assembly_order(self, selected_names: List[str])-> None: 
+    def set_assembly_order(self, selected_names: List[str])-> None:
         """Set the assmebly order from user selected seqeunce names"""
 
         self.assembly_sequences = [
-            self.available_sequences[name] for name in selected_names 
+            self.available_sequences[name] for name in selected_names
         ]
 
-    def design_tar_primers(self) -> Dict[str, Seq]: 
+    def design_tar_primers(self) -> Dict[str, Seq]:
         """Design TAR primers with the necesary overhangs
         
         uses the design_circular_primers function from primer_utils to design primers 
@@ -202,18 +189,18 @@ class TARDesigner:
             ValueError: If no sequences have been selected for assembly. 
         """
 
-        if not self.assembly_sequences: 
+        if not self.assembly_sequences:
             raise ValueError("No sequences selected for assembly. Please select sequences first")
-        
+
         self.primers = design_circular_primers(
-            self.assembly_sequences, 
-            target_tm = self.annealing_temp, 
+            self.assembly_sequences,
+            target_tm = self.annealing_temp,
             overhang_length = self.homology_length
         )
 
         return self.primers
 
-    def check_primer_locations(self, primer_folder: Path) -> None: 
+    def check_primer_locations(self, primer_folder: Path) -> None:
         """Check for exisiting primers stored in plates
         
         Uses primer locations functions from primer_utils to find exisiting primers in 
@@ -224,15 +211,15 @@ class TARDesigner:
 
         Raises: 
             ValueError: if primers haven't been desinged yet
-        """ 
-        if not self.primers: 
+        """
+        if not self.primers:
             raise ValueError("No primers to look for, please design primers first")
-        
+
         self.primers_found, self.missing_primers = get_primer_locations(
-            self.primers, 
+            self.primers,
             str(primer_folder)
         )
-        
+
 
     def find_templates(self, template_folder: Path) -> None:
         """Find template matches for each assembly component.
@@ -268,19 +255,19 @@ class TARDesigner:
         """
         if not self.primers_found and not self.missing_primers:
             raise ValueError("No primer location data. Please check primer locations first.")
-        
+
         if not self.template_dict:
             raise ValueError("No template data. Please find templates first.")
-            
+
         self.rationalized_primers = rationalize_primers(
             self.primers_found,
             self.missing_primers
         )
-        
+
         self.rationalized_templates = rationalize_templates(self.template_dict)
 
         return self.rationalized_primers, self.rationalized_templates
-    
+
     def write_instructions(self) -> List[List[str]]:
         """Generate assembly instructions for the TAR cloning experiment.
         
@@ -292,17 +279,17 @@ class TARDesigner:
         """
         if not self.rationalized_primers:
             raise ValueError("No rationalized primer data. Please rationalize selections first.")
-            
+
         if not self.rationalized_templates:
             raise ValueError("No rationalized template data. Please rationalize selections first.")
-            
+
         return write_circular_instructions(
             self.rationalized_primers,
             self.rationalized_templates,
             self.assembly_sequences,
             self.homology_length
         )
-    
+
     def create_assembly(self) -> SeqRecord:
         """Create the assembled sequence with all parts and primers.
         
@@ -314,10 +301,10 @@ class TARDesigner:
         """
         if not self.primers:
             raise ValueError("No primers available. Please design primers first.")
-            
+
         if not self.assembly_sequences:
             raise ValueError("No sequences selected. Please select sequences first.")
-            
+
         self.final_assembled_plasmid = assemble_parts_circular(
             self.assembly_sequences,
             self.primers,
