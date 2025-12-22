@@ -1,0 +1,7 @@
+Part	F_Plate	F_Name	F_Well	R_Plate	R_Name	R_Well	Template	Size
+pTEF1	N/A	pTEF1_0F-2Micron	N/A	N/A	pTEF1_0R-YeRFP	N/A	chr16	462
+YeRFP	N/A	YeRFP_1F-pTEF1	N/A	N/A	YeRFP_1R-tDIT1	N/A	pUC19_yEMRFP	761
+tDIT1	N/A	tDIT1_2F-YeRFP	N/A	N/A	tDIT1_2R-Ura3	N/A	chr04	484
+Ura3	N/A	Ura3_3F-tDIT1	N/A	N/A	Ura3_3R-AmpR_ColE1	N/A	pYES2	1103
+AmpR_ColE1	N/A	AmpR_ColE1_4F-Ura3	N/A	Demo Plate	AmpR_ColE1_4R-2Micron	C4	pUC19	1819
+2Micron	Demo Plate	2Micron_5F-AmpR_ColE1	C5	N/A	2Micron_5R-pTEF1	N/A	pESC-TRP	1393

@@ -14,11 +14,11 @@ from pyeast.core.integration import IntegrationDesigner
 from pyeast.utils.sequence_utils import load_sequences
 
 
-#Helper functions to load test data 
-def load_expected_primers(test_case_dir): 
+#Helper functions to load test data
+def load_expected_primers(test_case_dir):
     '''Load expected primers from a tsv file'''
-    primers_file = Path('tests/data')/test_case_dir/'expected_outputs'/'primers.tsv'
-    if not primers_file.exists(): 
+    primers_file = Path('tests/fixtures')/test_case_dir/'expected'/'primers.tsv'
+    if not primers_file.exists():
         print("didn't find some primers")
         return {}
 
@@ -27,11 +27,24 @@ def load_expected_primers(test_case_dir):
 
 def load_expected_instructions(test_case_dir):
     '''Load expected instructions from TSV file'''
-    instructions_file = Path('tests/data')/test_case_dir/'expected_output'/'instructions.tsv'
-    if not instructions_file.exists(): 
+    instructions_file = Path('tests/fixtures')/test_case_dir/'expected'/'instructions.tsv'
+    if not instructions_file.exists():
         return []
     df = pd.read_csv(instructions_file, sep = '\t')
     return df.values.tolist()
+
+def load_expected_assembly(test_case_dir, assembly_type='tar'):
+    """Load expected assembled sequence from GenBank file."""
+    if assembly_type == 'tar':
+        gb_file = Path('tests/fixtures')/test_case_dir/'expected'/'tar_test.gb'
+    else:  # integration
+        gb_file = Path('tests/fixtures')/test_case_dir/'expected'/'Integrate_test.gb'
+
+    if not gb_file.exists():
+        return None
+
+    record = SeqIO.read(gb_file, 'genbank')
+    return record
 
 @pytest.fixture
 def mock_console_interaction():
@@ -74,36 +87,47 @@ def mock_console_interaction():
             'click_confirm': mock_click_confirm
         }
 
-def test_tar_designer_real_world_case(mock_console_interaction): 
+def test_tar_designer_real_world_case(mock_console_interaction):
     '''Test TARDesigner against a known real world case.'''
-    
-    test_case_dir = 'known_good_tar_case'
 
-    #skip if test data doesn't exist yet 
-    input_dir = Path('tests/data')/test_case_dir/'input'
-    if not input_dir.exists() or not any(input_dir.glob('*.fasta')): 
+    test_case_dir = 'golden_tar'
+
+    #skip if test data doesn't exist yet
+    input_dir = Path('tests/fixtures')/test_case_dir/'input'
+    if not input_dir.exists() or not any(input_dir.glob('*.fasta')):
         pytest.skip('Test data not yet set up')
 
-    #Load test sequences 
-
+    #Load test sequences
     sequences = load_sequences(input_dir)
-    expected_primers = load_expected_primers(test_case_dir)
 
     designer = TARDesigner(homology_length=25)
     designer.available_sequences = sequences
 
-    #defined assembly order matches the order in the example case 
+    #defined assembly order matches the order in the example case
     assembly_order = ['pTEF1', 'YeRFP', 'tDIT1', 'Ura3', 'AmpR_ColE1', '2Micron']
 
     designer.set_assembly_order(assembly_order)
     designer.design_tar_primers()
 
-    #test primer seqeunces 
-    if expected_primers: 
-        for name, expected_sequence in expected_primers.items(): 
-            assert name in designer.primers, f'Expected primer {name} not found'
-            actaul_sequence = str(designer.primers[name])
-            assert actaul_sequence == expected_sequence, f'Primer {name}: {expected_sequence}. got {actaul_sequence}'
+    # Test 1: Check primer count (should have 2 primers per part for circular assembly)
+    expected_primer_count = len(assembly_order) * 2  # 6 parts * 2 = 12 primers
+    assert len(designer.primers) == expected_primer_count, \
+        f"Expected {expected_primer_count} primers, got {len(designer.primers)}"
+
+    # Test 2: Validate assembled sequence matches expected
+    actual_assembly = designer.create_assembly()
+    expected_assembly = load_expected_assembly('golden_tar', 'tar')
+
+    assert actual_assembly is not None, "Failed to create assembly"
+
+    if expected_assembly:
+        # Compare sequences case-insensitively (case may vary in FASTA files)
+        assert str(actual_assembly.seq).upper() == str(expected_assembly.seq).upper(), \
+            "Assembled DNA sequence doesn't match expected golden master"
+        assert actual_assembly.annotations.get('topology') == 'circular', \
+            "TAR assembly should be circular"
+        assert len(actual_assembly.seq) == 5722, \
+            f"Expected 5722 bp assembly, got {len(actual_assembly.seq)}"
 
 # def test_tar_designer_full_workflow(mock_console_interaction): 
 #     '''Test the complete TAR workflow including instruction generation'''
@@ -238,73 +262,135 @@ def test_tar_designer_real_world_case(mock_console_interaction):
 #         # Check primer name format (should contain sequence names and direction)
 #         assert any(seq_name in primer_name for seq_name in assembly_order), f"Primer {primer_name} should reference assembly sequences"
 
-### Claude tests for integrate follow - re-written by hand. 
+### Claude tests for integrate follow - re-written by hand.
 def test_integration_designer_real_world_case(mock_console_interaction):
     """Test IntegrationDesigner against a known real world case."""
-    test_case_dir = 'known_good_integration_case'
-    
-    
-    # Skip if test data doesn't exist yet 
-    input_dir = Path('tests/data')/test_case_dir/'input'
-    if not input_dir.exists() or not any(input_dir.glob('*.fasta')): 
+    test_case_dir = 'golden_integrate'
+
+
+    # Skip if test data doesn't exist yet
+    input_dir = Path('tests/fixtures')/test_case_dir/'input'
+    if not input_dir.exists() or not any(input_dir.glob('*.fasta')):
         pytest.skip('Test data not yet set up')
 
-    # Load test sequences 
+    # Load test sequences
     sequences = load_sequences(input_dir)
-    expected_primers = load_expected_primers(test_case_dir)
-    
 
     # Create designer
     designer = IntegrationDesigner(homology_length=25)
-    
+
     # Set up sequences directly (bypass interactive methods)
     # Components: pTEF1, YeGFP, tDIT1 (biologically sensible integration)
     component_names = ['pTEF1', 'YeGFP', 'tDIT1']
-    
+
     # Set components
     designer.components = {}
     for name in component_names:
         if name in sequences:
             designer.components[name] = sequences[name]
-    
+
     # Set up Ura3MX integration site (assuming it exists in sequences)
     # Look for Ura3MX upstream and downstream sequences
     ura3mx_upstream = None
     ura3mx_downstream = None
-    
+
     for seq_name, seq_record in sequences.items():
         if 'ura3mx' in seq_name.lower():
             if 'upstream' in seq_name.lower() or 'up' in seq_name.lower():
                 ura3mx_upstream = seq_record
             elif 'downstream' in seq_name.lower() or 'down' in seq_name.lower():
                 ura3mx_downstream = seq_record
-    
+
     # Set up integration site
     if ura3mx_upstream and ura3mx_downstream:
         designer.int_sites = {'Ura3MX': (ura3mx_upstream, ura3mx_downstream)}
         designer.int_site = 'Ura3MX'
 
-        
+
         # Set assembly sequences: upstream + components + downstream
         component_seqs = [designer.components[name] for name in component_names if name in designer.components]
         designer.assembly_sequences = [ura3mx_upstream] + component_seqs + [ura3mx_downstream]
-        
+
         # Design integration primers (this should be non-interactive)
         designer.design_integration_primers()
 
-        # Basic validation
-        assert len(designer.primers) > 0, "Should have designed some primers"
-        
-        
-        # Test primer sequences against expected ones (if they exist)
-        if expected_primers:
-            
-            for name, expected_sequence in expected_primers.items(): 
-                assert name in designer.primers, f'Expected primer {name} not found'
-                
-                actual_sequence = str(designer.primers[name])
-                assert actual_sequence == expected_sequence, f'Primer {name}: expected {expected_sequence}, got {actual_sequence}'
+        # Test 1: Check primer count
+        # Integration creates: 2 primers for each component + 2 primers for each integration site arm
+        # = (3 components × 2) + (2 integration arms × 2) = 6 + 4 = 10 primers
+        expected_primer_count = 10
+        assert len(designer.primers) == expected_primer_count, \
+            f"Expected {expected_primer_count} primers, got {len(designer.primers)}"
+
+        # Test 2: Validate assembled sequence matches expected
+        actual_assembly = designer.create_linear_assembly()
+        expected_assembly = load_expected_assembly('golden_integrate', 'integration')
+
+        if expected_assembly:
+            # Compare sequences case-insensitively (case may vary in FASTA files)
+            assert str(actual_assembly.seq).upper() == str(expected_assembly.seq).upper(), \
+                "Assembled DNA sequence doesn't match expected golden master"
+            assert actual_assembly.annotations.get('topology') == 'linear', \
+                "Integration assembly should be linear"
+            assert len(actual_assembly.seq) == 3630, \
+                f"Expected 3630 bp assembly, got {len(actual_assembly.seq)}"
     else:
         pytest.skip('Ura3MX integration site sequences not found in test data')
+
+
+def test_primers_tsv_format():
+    """Validate that primer TSV files have correct structure."""
+    # Test both TAR and Integration primer outputs
+    test_cases = ['golden_tar', 'golden_integrate']
+
+    for test_case in test_cases:
+        primers_file = Path('tests/fixtures')/test_case/'expected'/'primers.tsv'
+
+        # Skip if file doesn't exist
+        if not primers_file.exists():
+            pytest.skip(f'Primers file not found for {test_case}')
+
+        # Load TSV
+        df = pd.read_csv(primers_file, sep='\t')
+
+        # Required columns check
+        assert 'Name' in df.columns, f"{test_case}: Missing 'Name' column"
+        assert 'Sequence' in df.columns, f"{test_case}: Missing 'Sequence' column"
+
+        # No duplicate primer names
+        assert len(df['Name']) == len(df['Name'].unique()), \
+            f"{test_case}: Found duplicate primer names"
+
+        # Valid DNA sequences (ATGC only)
+        for idx, seq in enumerate(df['Sequence']):
+            assert len(seq) > 0, f"{test_case}: Empty sequence at row {idx}"
+            assert all(base in 'ATGC' for base in str(seq).upper()), \
+                f"{test_case}: Invalid DNA sequence at row {idx}: {seq}"
+
+
+def test_instructions_tsv_format():
+    """Validate that instructions TSV files have correct structure."""
+    test_cases = ['golden_tar', 'golden_integrate']
+
+    for test_case in test_cases:
+        instructions_file = Path('tests/fixtures')/test_case/'expected'/'instructions.tsv'
+
+        # Skip if file doesn't exist
+        if not instructions_file.exists():
+            pytest.skip(f'Instructions file not found for {test_case}')
+
+        # Load TSV
+        df = pd.read_csv(instructions_file, sep='\t')
+
+        # Required columns (9 total from TARDesigner/IntegrationDesigner)
+        expected_columns = ['Part', 'F_Plate', 'F_Name', 'F_Well',
+                           'R_Plate', 'R_Name', 'R_Well', 'Template', 'Size']
+        for col in expected_columns:
+            assert col in df.columns, f"{test_case}: Missing column: {col}"
+
+        # Validate data types
+        assert df['Size'].dtype in [int, 'int64', 'float64'], \
+            f"{test_case}: Size column should be numeric"
+        assert all(df['Part'].notna()), \
+            f"{test_case}: Part names should not be empty"
 
 
