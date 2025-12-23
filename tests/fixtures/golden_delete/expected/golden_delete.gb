@@ -1,0 +1,45 @@
+LOCUS       golden_delete           1533 bp    DNA     linear   UNK 01-JAN-1980
+DEFINITION  Deletion cassette for chr15:564475-566191.
+ACCESSION   deletion_cassette
+VERSION     deletion_cassette
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     misc_feature    1..300
+                     /label="upstream homology"
+     misc_feature    301..380
+                     /label="repeat"
+     gene            381..1433
+                     /label="URA3"
+     misc_feature    1434..1533
+                     /label="downstream homology"
+ORIGIN
+        1 agccgagaat tttgtaacac caacataaca ctgacatctt taacaacttt taattatgat
+       61 acatttctta cgtcatgatt gattattaca gctatgctga caaatgactc ttgttgcatg
+      121 gctacgaacc gggtaatact aagtgattga ctcttgctga ccttttatta agaactaaat
+      181 ggacaatatt atggagcatt tcatgtataa attggtgcgt aaaatcgttg gatctctctt
+      241 ctaagtacat cctactataa caatcaagaa aaacaagaaa atcggacaaa acaatcaagt
+      301 tatataagtt tattgatata cttgtacagc aaataattat aaaatgatat acctattttt
+      361 taggctttgt tatgattaca tgattcggta atctccgaac agaaggaaga acgaaggaag
+      421 gagcacagac ttagattggt atatatacgc atatgtagtg ttgaagaaac atgaaattgc
+      481 ccagtattct taacccaact gcacagaaca aaaacctgca ggaaacgaag ataaatcatg
+      541 tcgaaagcta catataagga acgtgctgct actcatccta gtcctgttgc tgccaagcta
+      601 tttaatatca tgcacgaaaa gcaaacaaac ttgtgtgctt cattggatgt tcgtaccacc
+      661 aaggaattac tggagttagt tgaagcatta ggtcccaaaa tttgtttact aaaaacacat
+      721 gtggatatct tgactgattt ttccatggag ggcacagtta agccgctaaa ggcattatcc
+      781 gccaagtaca attttttact cttcgaagac agaaaatttg ctgacattgg taatacagtc
+      841 aaattgcagt actctgcggg tgtatacaga atagcagaat gggcagacat tacgaatgca
+      901 cacggtgtgg tgggcccagg tattgttagc ggtttgaagc aggcggcaga agaagtaaca
+      961 aaggaaccta gaggcctttt gatgttagca gaattgtcat gcaagggctc cctatctact
+     1021 ggagaatata ctaagggtac tgttgacatt gcgaagagcg acaaagattt tgttatcggc
+     1081 tttattgctc aaagagacat gggtggaaga gatgaaggtt acgattggtt gattatgaca
+     1141 cccggtgtgg gtttagatga caagggagac gcattgggtc aacagtatag aaccgtggat
+     1201 gatgtggtct ctacaggatc tgacattatt attgttggaa gaggactatt tgcaaaggga
+     1261 agggatgcta aggtagaggg tgaacgttac agaaaagcag gctgggaagc atatttgaga
+     1321 agatgcggcc agcaaaacta aaaaactgta ttataagtaa atgcatgtat actaaactca
+     1381 caaattagag cttcaattta attatatcag ttattaccca ttgaaaaagg aaggaaaatg
+     1441 gaacagtttt tattaaagca agaagaagaa gttcttgtca aagcacaaaa gttagaaact
+     1501 gtcggttacg aagcttatct agaaaacaag taa
+//

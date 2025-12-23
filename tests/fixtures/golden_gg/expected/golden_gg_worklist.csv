@@ -1,0 +1,5 @@
+construct_id,asperate_plate,asperate_well,destination_plate,destination_well,transfer_volume
+golden_gg,YTK_MoClo,H11,assembly plate,A1,1
+golden_gg,YTK_MoClo,A3,assembly plate,A1,1
+golden_gg,YTK_MoClo,D12,assembly plate,A1,1
+golden_gg,YTK_MoClo,F8,assembly plate,A1,1
