@@ -1100,7 +1100,7 @@ def replace(upstream_homology_len, downstream_homology_len, repeat_length, genom
     """Design pop-in/pop-out replacements in Saccharomyces cerevisiae
     \b\n
     Note URA can be positions up or downstream of ura3
-    Target must be longer than 
+    Target must be longer than both homology arms
     Mechanism:
     
     \b
