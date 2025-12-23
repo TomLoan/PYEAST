@@ -39,7 +39,7 @@ uv sync --group dev
 uv run pyeast --help
 ```
 
-Don't worry too much about perfect style – things can be tidiesd up during review.
+Don't worry too much about perfect style – things can be tidied up during review.
 
 ## Adding Components
 
