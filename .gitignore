@@ -188,3 +188,4 @@ output/
 .pytest_cache
 .git
 .env*
+.claude
