@@ -1,0 +1,54 @@
+LOCUS       golden_replace          1945 bp    DNA     linear   UNK 01-JAN-1980
+DEFINITION  Replacement cassette for chr01:202904-203404.
+ACCESSION   replacement_cassette
+VERSION     replacement_cassette
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     misc_feature    1..200
+                     /label="upstream homology"
+     gene            201..1253
+                     /label="URA3"
+     misc_feature    1254..1333
+                     /label="repeat"
+     misc_feature    1334..1745
+                     /label="replacement"
+     misc_feature    1746..1945
+                     /label="downstream homology"
+ORIGIN
+        1 ctcattaatt gccctcacaa gaatttggaa gtgcgtagaa caggtaaaag attgtactac
+       61 agaggtattg tggaaccttc tacagtactt cggaatacac ctaaaaggtt gttggatgct
+      121 aaatttagca aaagtctttt ttagctcact attaggcttg ttaaagtctg aaattgttga
+      181 aaggcactca aaaagataaa tgattcggta atctccgaac agaaggaaga acgaaggaag
+      241 gagcacagac ttagattggt atatatacgc atatgtagtg ttgaagaaac atgaaattgc
+      301 ccagtattct taacccaact gcacagaaca aaaacctgca ggaaacgaag ataaatcatg
+      361 tcgaaagcta catataagga acgtgctgct actcatccta gtcctgttgc tgccaagcta
+      421 tttaatatca tgcacgaaaa gcaaacaaac ttgtgtgctt cattggatgt tcgtaccacc
+      481 aaggaattac tggagttagt tgaagcatta ggtcccaaaa tttgtttact aaaaacacat
+      541 gtggatatct tgactgattt ttccatggag ggcacagtta agccgctaaa ggcattatcc
+      601 gccaagtaca attttttact cttcgaagac agaaaatttg ctgacattgg taatacagtc
+      661 aaattgcagt actctgcggg tgtatacaga atagcagaat gggcagacat tacgaatgca
+      721 cacggtgtgg tgggcccagg tattgttagc ggtttgaagc aggcggcaga agaagtaaca
+      781 aaggaaccta gaggcctttt gatgttagca gaattgtcat gcaagggctc cctatctact
+      841 ggagaatata ctaagggtac tgttgacatt gcgaagagcg acaaagattt tgttatcggc
+      901 tttattgctc aaagagacat gggtggaaga gatgaaggtt acgattggtt gattatgaca
+      961 cccggtgtgg gtttagatga caagggagac gcattgggtc aacagtatag aaccgtggat
+     1021 gatgtggtct ctacaggatc tgacattatt attgttggaa gaggactatt tgcaaaggga
+     1081 agggatgcta aggtagaggg tgaacgttac agaaaagcag gctgggaagc atatttgaga
+     1141 agatgcggcc agcaaaacta aaaaactgta ttataagtaa atgcatgtat actaaactca
+     1201 caaattagag cttcaattta attatatcag ttattaccca ttgaaaaagg aagacggaga
+     1261 atacgtaggc tgactttttc gtcagtttgt tgtccgttta caaaattggt gaatgaattc
+     1321 tagccttcct ctgatagctt caaaatgttt ctactccttt tttactcttc cagattttct
+     1381 cggactccgc gcatcgccgt accacttcaa aacacccaag cacagcatac taaatttccc
+     1441 ctctttcttc ctctagggtg tcgttaatta cccgtactaa aggtttggaa aagaaaaaag
+     1501 agaccgcctc gtttcttttt cttcgtcgaa aaaggcaata aaaattttta tcacgtttct
+     1561 ttttcttgaa aatttttttt tttgattttt ttctctttcg atgacctccc attgatattt
+     1621 aagttaataa acggtcttca atttctcaag tttcagtttc atttttcttg ttctattaca
+     1681 acttttttta cttcttgctc attagaaaga aagcatagca atctaatcta agttttaatt
+     1741 acaaaatgac aatgcctcat cgctatatgt ttttggcagt ctttacactt ctggcactaa
+     1801 ctagtgtggc ctcaggagcc acagaggcgt gcttaccagc aggccagagg aaaagtggga
+     1861 tgaatataaa tttttaccag tattcattga aagattcctc cacatattcg aatgcagcat
+     1921 atatggctta tggatatgcc tcaaa
+//

@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch
 from pyeast.core.tar import TARDesigner
 from pyeast.core.integration import IntegrationDesigner
 from pyeast.core.deletion import DeletionDesigner
+from pyeast.core.replace import ReplaceDesigner
 from pyeast.utils.sequence_utils import load_sequences
 
 
@@ -57,6 +58,8 @@ def mock_console_interaction():
          patch('pyeast.core.integration.Console') as mock_int_console, \
          patch('pyeast.core.deletion.PromptSession') as mock_del_session, \
          patch('pyeast.core.deletion.Console') as mock_del_console, \
+         patch('pyeast.core.replace.PromptSession') as mock_rep_session, \
+         patch('pyeast.core.replace.Console') as mock_rep_console, \
          patch('click.confirm') as mock_click_confirm:
         
         # Mock the session to avoid prompt_toolkit calls
@@ -86,6 +89,14 @@ def mock_console_interaction():
         mock_del_console_instance = Mock()
         mock_del_console.return_value = mock_del_console_instance
 
+        # Mock the Replace session
+        mock_rep_session_instance = Mock()
+        mock_rep_session.return_value = mock_rep_session_instance
+
+        # Mock Replace console
+        mock_rep_console_instance = Mock()
+        mock_rep_console.return_value = mock_rep_console_instance
+
         # Mock click.confirm to always return True
         mock_click_confirm.return_value = True
 
@@ -97,6 +108,8 @@ def mock_console_interaction():
             'int_console': mock_int_console_instance,
             'del_session': mock_del_session_instance,
             'del_console': mock_del_console_instance,
+            'rep_session': mock_rep_session_instance,
+            'rep_console': mock_rep_console_instance,
             'click_confirm': mock_click_confirm
         }
 
@@ -467,6 +480,90 @@ def test_deletion_designer_golden_case(mock_console_interaction):
         f"Cassette should have repeat feature. Found labels: {feature_labels}"
     assert any('ura3' in str(label).lower() for label in feature_labels), \
         f"Cassette should have URA3 marker feature. Found labels: {feature_labels}"
+    assert any('downstream' in str(label).lower() for label in feature_labels), \
+        f"Cassette should have downstream homology feature. Found labels: {feature_labels}"
+
+    # Test 3: Design screening primers
+    forward_primer, reverse_primer, product_sizes = designer.design_screening_strategy(genome_file)
+
+    # Check that 2 primers were designed (not checking specific sequences)
+    assert forward_primer is not None, "Forward primer should be designed"
+    assert reverse_primer is not None, "Reverse primer should be designed"
+    assert len(forward_primer) > 0, "Forward primer should not be empty"
+    assert len(reverse_primer) > 0, "Reverse primer should not be empty"
+
+
+def test_replace_designer_golden_case(mock_console_interaction):
+    """Test ReplaceDesigner against a known replacement case."""
+    test_case_dir = 'golden_replace'
+
+    # Skip if test data doesn't exist yet
+    input_dir = Path('tests/fixtures')/test_case_dir/'input'
+    target_file = input_dir/'input.fasta'
+    replacement_file = input_dir/'pTEF1.fasta'
+
+    if not target_file.exists() or not replacement_file.exists():
+        pytest.skip('Test data not yet set up')
+
+    # Load input sequences
+    target_seq = SeqIO.read(target_file, 'fasta')
+    replacement_seq = SeqIO.read(replacement_file, 'fasta')
+
+    # Create designer with parameters matching golden case
+    # From README: marker position is "up" (upstream)
+    designer = ReplaceDesigner(
+        upstream_homology_len=200,
+        downstream_homology_len=200,
+        repeat_length=80
+    )
+
+    # Set the target sequence and replacement sequence
+    designer.target_sequence = str(target_seq.seq)
+    designer.replacement_sequence = replacement_seq
+    designer.marker_position = "upstream"  # From README
+
+    # Find target in genome (using default genome file in data/templates/)
+    genome_file = Path('data/templates/BY4741_Toronto_2012.fsa')
+    if not genome_file.exists():
+        pytest.skip('Genome file not found - required for replace tests')
+
+    location = designer.find_target_sequence(genome_file, designer.target_sequence)
+    assert location is not None, "Target sequence should be found in genome"
+    designer.genome_location = location
+
+    # Create replacement cassette
+    ura3_file = Path('data/component libraries/Saccharomyces cerevisiae/URA3.fasta')
+    if not ura3_file.exists():
+        pytest.skip('URA3 file not found - required for replace tests')
+
+    cassette = designer.make_replacement_cassette(genome_file, ura3_file)
+    assert cassette is not None, "Failed to create replacement cassette"
+
+    # Test 1: Validate cassette sequence matches expected
+    expected_cassette = SeqIO.read(
+        Path('tests/fixtures')/test_case_dir/'expected'/'golden_replace.gb',
+        'genbank'
+    )
+
+    # Compare sequences case-insensitively (case may vary in FASTA files)
+    assert str(cassette.seq).upper() == str(expected_cassette.seq).upper(), \
+        "Replacement cassette sequence doesn't match golden master"
+    assert len(cassette.seq) == 1945, \
+        f"Expected 1945 bp cassette, got {len(cassette.seq)}"
+
+    # Test 2: Validate cassette has correct feature structure
+    # Expected features: upstream homology, URA3, repeat, replacement, downstream homology
+    feature_labels = [f.qualifiers.get('label', [''])[0] if isinstance(f.qualifiers.get('label'), list)
+                     else f.qualifiers.get('label', '') for f in cassette.features]
+
+    assert any('upstream' in str(label).lower() for label in feature_labels), \
+        f"Cassette should have upstream homology feature. Found labels: {feature_labels}"
+    assert any('ura3' in str(label).lower() for label in feature_labels), \
+        f"Cassette should have URA3 marker feature. Found labels: {feature_labels}"
+    assert any('repeat' in str(label).lower() for label in feature_labels), \
+        f"Cassette should have repeat feature. Found labels: {feature_labels}"
+    assert any('replacement' in str(label).lower() for label in feature_labels), \
+        f"Cassette should have replacement sequence feature. Found labels: {feature_labels}"
     assert any('downstream' in str(label).lower() for label in feature_labels), \
         f"Cassette should have downstream homology feature. Found labels: {feature_labels}"
 
