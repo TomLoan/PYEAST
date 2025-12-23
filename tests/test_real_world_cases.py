@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 
 from pyeast.core.tar import TARDesigner
 from pyeast.core.integration import IntegrationDesigner
+from pyeast.core.deletion import DeletionDesigner
 from pyeast.utils.sequence_utils import load_sequences
 
 
@@ -54,36 +55,48 @@ def mock_console_interaction():
          patch('pyeast.core.tar.confirm') as mock_tar_confirm, \
          patch('pyeast.core.integration.PromptSession') as mock_int_session, \
          patch('pyeast.core.integration.Console') as mock_int_console, \
+         patch('pyeast.core.deletion.PromptSession') as mock_del_session, \
+         patch('pyeast.core.deletion.Console') as mock_del_console, \
          patch('click.confirm') as mock_click_confirm:
         
         # Mock the session to avoid prompt_toolkit calls
         mock_tar_session_instance = Mock()
         mock_tar_session.return_value = mock_tar_session_instance
-        
+
         # Mock console to avoid rich output issues
         mock_tar_console_instance = Mock()
         mock_tar_console.return_value = mock_tar_console_instance
-        
+
         # Mock confirm to always return True
         mock_tar_confirm.return_value = True
-        
+
         # Mock the Integration session
         mock_int_session_instance = Mock()
         mock_int_session.return_value = mock_int_session_instance
-        
+
         # Mock Integration console
         mock_int_console_instance = Mock()
         mock_int_console.return_value = mock_int_console_instance
-        
+
+        # Mock the Deletion session
+        mock_del_session_instance = Mock()
+        mock_del_session.return_value = mock_del_session_instance
+
+        # Mock Deletion console
+        mock_del_console_instance = Mock()
+        mock_del_console.return_value = mock_del_console_instance
+
         # Mock click.confirm to always return True
         mock_click_confirm.return_value = True
-        
+
         yield {
             'tar_session': mock_tar_session_instance,
             'tar_console': mock_tar_console_instance,
             'tar_confirm': mock_tar_confirm,
             'int_session': mock_int_session_instance,
             'int_console': mock_int_console_instance,
+            'del_session': mock_del_session_instance,
+            'del_console': mock_del_console_instance,
             'click_confirm': mock_click_confirm
         }
 
@@ -392,5 +405,78 @@ def test_instructions_tsv_format():
             f"{test_case}: Size column should be numeric"
         assert all(df['Part'].notna()), \
             f"{test_case}: Part names should not be empty"
+
+
+def test_deletion_designer_golden_case(mock_console_interaction):
+    """Test DeletionDesigner against a known deletion case."""
+    test_case_dir = 'golden_delete'
+
+    # Skip if test data doesn't exist yet
+    input_file = Path('tests/fixtures')/test_case_dir/'input'/'input.fasta'
+    if not input_file.exists():
+        pytest.skip('Test data not yet set up')
+
+    # Load input sequence (the target gene to delete)
+    input_seq = SeqIO.read(input_file, 'fasta')
+
+    # Create designer with parameters matching golden case
+    designer = DeletionDesigner(
+        upstream_homology_len=300,
+        downstream_homology_len=100,
+        repeat_length=80
+    )
+
+    # Set the target sequence
+    designer.target_sequence = str(input_seq.seq)
+
+    # Find target in genome (using default genome file in data/templates/)
+    genome_file = Path('data/templates/BY4741_Toronto_2012.fsa')
+    if not genome_file.exists():
+        pytest.skip('Genome file not found - required for deletion tests')
+
+    location = designer.find_target_sequence(genome_file, designer.target_sequence)
+    assert location is not None, "Target sequence should be found in genome"
+    designer.genome_location = location
+
+    # Create deletion cassette
+    ura3_file = Path('data/component libraries/Saccharomyces cerevisiae/URA3.fasta')
+    if not ura3_file.exists():
+        pytest.skip('URA3 file not found - required for deletion tests')
+
+    cassette = designer.make_deletion_cassette(genome_file, ura3_file)
+    assert cassette is not None, "Failed to create deletion cassette"
+
+    # Test 1: Validate cassette sequence matches expected
+    expected_cassette = SeqIO.read(
+        Path('tests/fixtures')/test_case_dir/'expected'/'golden_delete.gb',
+        'genbank'
+    )
+
+    # Compare sequences case-insensitively (case may vary in FASTA files)
+    assert str(cassette.seq).upper() == str(expected_cassette.seq).upper(), \
+        "Deletion cassette sequence doesn't match golden master"
+    assert len(cassette.seq) == 1533, \
+        f"Expected 1533 bp cassette, got {len(cassette.seq)}"
+
+    # Test 2: Validate cassette has correct feature structure
+    feature_labels = [f.qualifiers.get('label', [''])[0] if isinstance(f.qualifiers.get('label'), list)
+                     else f.qualifiers.get('label', '') for f in cassette.features]
+    assert any('upstream' in str(label).lower() for label in feature_labels), \
+        f"Cassette should have upstream homology feature. Found labels: {feature_labels}"
+    assert any('repeat' in str(label).lower() for label in feature_labels), \
+        f"Cassette should have repeat feature. Found labels: {feature_labels}"
+    assert any('ura3' in str(label).lower() for label in feature_labels), \
+        f"Cassette should have URA3 marker feature. Found labels: {feature_labels}"
+    assert any('downstream' in str(label).lower() for label in feature_labels), \
+        f"Cassette should have downstream homology feature. Found labels: {feature_labels}"
+
+    # Test 3: Design screening primers
+    forward_primer, reverse_primer, product_sizes = designer.design_screening_strategy(genome_file)
+
+    # Check that 2 primers were designed (not checking specific sequences)
+    assert forward_primer is not None, "Forward primer should be designed"
+    assert reverse_primer is not None, "Reverse primer should be designed"
+    assert len(forward_primer) > 0, "Forward primer should not be empty"
+    assert len(reverse_primer) > 0, "Reverse primer should not be empty"
 
 
