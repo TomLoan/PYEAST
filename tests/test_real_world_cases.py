@@ -13,6 +13,7 @@ from pyeast.core.tar import TARDesigner
 from pyeast.core.integration import IntegrationDesigner
 from pyeast.core.deletion import DeletionDesigner
 from pyeast.core.replace import ReplaceDesigner
+from pyeast.core.gg import ggDesigner
 from pyeast.utils.sequence_utils import load_sequences
 
 
@@ -60,6 +61,8 @@ def mock_console_interaction():
          patch('pyeast.core.deletion.Console') as mock_del_console, \
          patch('pyeast.core.replace.PromptSession') as mock_rep_session, \
          patch('pyeast.core.replace.Console') as mock_rep_console, \
+         patch('pyeast.core.gg.PromptSession') as mock_gg_session, \
+         patch('pyeast.core.gg.Console') as mock_gg_console, \
          patch('click.confirm') as mock_click_confirm:
         
         # Mock the session to avoid prompt_toolkit calls
@@ -97,6 +100,14 @@ def mock_console_interaction():
         mock_rep_console_instance = Mock()
         mock_rep_console.return_value = mock_rep_console_instance
 
+        # Mock the GG session
+        mock_gg_session_instance = Mock()
+        mock_gg_session.return_value = mock_gg_session_instance
+
+        # Mock GG console
+        mock_gg_console_instance = Mock()
+        mock_gg_console.return_value = mock_gg_console_instance
+
         # Mock click.confirm to always return True
         mock_click_confirm.return_value = True
 
@@ -110,6 +121,8 @@ def mock_console_interaction():
             'del_console': mock_del_console_instance,
             'rep_session': mock_rep_session_instance,
             'rep_console': mock_rep_console_instance,
+            'gg_session': mock_gg_session_instance,
+            'gg_console': mock_gg_console_instance,
             'click_confirm': mock_click_confirm
         }
 
@@ -577,3 +590,76 @@ def test_replace_designer_golden_case(mock_console_interaction):
     assert len(reverse_primer) > 0, "Reverse primer should not be empty"
 
 
+def test_gg_designer_golden_case(mock_console_interaction):
+    """Test ggDesigner (Golden Gate) against a known assembly case."""
+    test_case_dir = 'golden_gg'
+
+    # Skip if test data doesn't exist yet
+    input_file = Path('tests/fixtures')/test_case_dir/'input'/'input.txt'
+    if not input_file.exists():
+        pytest.skip('Test data not yet set up')
+
+    # Load component sequences from existing MoClo library
+    component_lib = Path('data/component libraries/Yeast Moclo lvl 0')
+    if not component_lib.exists():
+        pytest.skip('MoClo component library not found - required for GG tests')
+
+    sequences = load_sequences(component_lib)
+
+    # Create designer
+    designer = ggDesigner(is_library=False)
+    designer.available_sequences = sequences
+
+    # Set plasmid directory (critical for GG!)
+    designer.gg_plasmids = component_lib / 'plasmids'
+    if not designer.gg_plasmids.exists():
+        pytest.skip('MoClo plasmid directory not found - required for GG tests')
+
+    # Set assembly order (from input.txt)
+    # Assembly: 1_ConL1, 234_Spacer, 5_ConR2, 678_AmpR-ColE1
+    assembly_order = ['1_ConL1', '234_Spacer', '5_ConR2', '678_AmpR-ColE1']
+    designer.assemblies_names = [assembly_order]  # List of assemblies (single assembly in this case)
+
+    # Get plasmid names (maps parts to plasmids)
+    try:
+        plasmid_names = designer.get_plasmid_names()
+        assert plasmid_names is not None, "Failed to get plasmid names"
+        assert len(plasmid_names) == 4, f"Expected 4 plasmids, got {len(plasmid_names)}"
+    except Exception as e:
+        pytest.fail(f"Part-to-plasmid mapping failed: {e}")
+
+    # Run GG assembly simulation
+    try:
+        assembly = designer.gg_assembly('golden_gg')
+        assert assembly is not None, "Failed to create assembly"
+    except Exception as e:
+        pytest.fail(f"GG assembly simulation failed: {e}")
+
+    # Validate assembly simulation
+    assert hasattr(designer, 'assembly_sim'), "Assembly simulation not created"
+    assert designer.assembly_sim is not None, "Assembly simulation is None"
+
+    # Test 1: Check construct count (should be exactly 1)
+    construct_records = designer.assembly_sim.construct_records
+    assert len(construct_records) == 1, \
+        f"Expected 1 construct, got {len(construct_records)}"
+
+    # Test 2: Validate assembled sequence matches expected
+    actual_assembly = construct_records[0]
+    expected_assembly = SeqIO.read(
+        Path('tests/fixtures')/test_case_dir/'expected'/'golden_gg.gb',
+        'genbank'
+    )
+
+    # Compare sequences case-insensitively (case may vary in FASTA files)
+    assert str(actual_assembly.seq).upper() == str(expected_assembly.seq).upper(), \
+        "Assembled DNA sequence doesn't match golden master"
+
+    # Test 3: Validate assembly properties
+    assert len(actual_assembly.seq) == 2278, \
+        f"Expected 2278 bp assembly, got {len(actual_assembly.seq)}"
+
+    # Check topology (circular for MoClo level 1)
+    topology = actual_assembly.annotations.get('topology', 'linear')
+    assert topology == 'circular', \
+        f"Expected circular topology, got {topology}"
