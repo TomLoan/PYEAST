@@ -225,7 +225,7 @@ def rationalize_primers(primers_found: Dict[str, List],  primers_missing : Dict[
                 plate_count[plate] +=1
             else:
                 plate_count[plate] = 1
-
+    # print(plate_count)
 
     #Select primers from the plates that appear most frequently
     selected_primers = {}
@@ -240,7 +240,7 @@ def rationalize_primers(primers_found: Dict[str, List],  primers_missing : Dict[
 
     for primer_name, primer_info_list in primers_missing.items():
         selected_primers[primer_name] = primer_info_list[0]
-
+    
     return selected_primers
 
 def add_circular_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], overhang_length: int) -> Dict[str, Seq]:
