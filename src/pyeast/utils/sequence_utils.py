@@ -151,7 +151,7 @@ def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]
 
         if not templates_used[part.name]:
             templates_used[part.name] = ["Not found"]
-
+    
     return templates_used
 
 def rationalize_templates(template_dict: Dict[str, List[str]]) -> Dict[str, str]:
@@ -173,9 +173,10 @@ def rationalize_templates(template_dict: Dict[str, List[str]]) -> Dict[str, str]
     preferred_templates = ['pUC19', 'pYES2', 'pESC-TRP', ]  # Add more as needed
 
     # Count the global frequency of each template
+    
     all_templates = [template for templates in template_dict.values() for template in templates if template != "Not found"]
     template_frequency = Counter(all_templates)
-
+    # print(all_templates)
     def choose_best_template(templates):
         if not templates or templates[0] == "Not found":
             return "Not found"
