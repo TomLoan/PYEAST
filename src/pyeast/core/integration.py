@@ -40,6 +40,7 @@ from rich.table import Table
 
 from ..utils.primer_utils import design_linear_primers, get_primer_locations, rationalize_primers
 from ..utils.sequence_utils import assemble_parts_linear, get_templates, load_sequences, rationalize_templates, write_linear_instructions
+from ..utils.path_utils import get_integration_sites_path
 
 
 class IntegrationDesigner:
@@ -67,7 +68,7 @@ class IntegrationDesigner:
         self.components = load_sequences(components_dir)
 
         # Load integration sites from standard location
-        int_sites_dir = Path("data/integration sites")
+        int_sites_dir = get_integration_sites_path()
         self.int_sites = self._load_int_sites(int_sites_dir)
 
         if not self.components:
@@ -153,10 +154,10 @@ class IntegrationDesigner:
         Each site should have two sequences: upstream and downstream homology.
         """
         if directory is None:
-            directory = Path("data/integration sites")
+            directory = get_integration_sites_path()
 
         # Also check private directory
-        private_dir = Path("data/private/integration sites")
+        private_dir = get_integration_sites_path(private=True)
 
         int_sites = {}
 

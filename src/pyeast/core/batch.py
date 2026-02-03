@@ -52,6 +52,7 @@ from tabulate import tabulate
 
 from ..utils.primer_utils import get_primer_locations, rationalize_primers
 from ..utils.sequence_utils import get_templates, rationalize_templates
+from ..utils.path_utils import get_primers_path, get_templates_path, get_output_path
 
 
 class BatchDesigner:
@@ -75,25 +76,25 @@ class BatchDesigner:
     def __init__(self,
                  reuse_limit = 5,
                  batch_size: int = 96,
-                 primer_folder: Path = Path("data/primers"),
-                 template_folder: Path = Path("data/templates"),
-                 output_folder: Path = Path("output")):
+                 primer_folder: Optional[Path] = None,
+                 template_folder: Optional[Path] = None,
+                 output_folder: Optional[Path] = None):
         """Initialize BatchDesigner with specified parameters.
-        
+
         Args:
-            homology_length: Length of homology regions for assembly (default: 25)
+            reuse_limit: Maximum times a PCR product can be reused (default: 5)
             batch_size: Maximum number of PCRs per batch (default: 96)
-            primer_folder: Path to folder containing primer files
-            template_folder: Path to folder containing template files
-            output_folder: Path to store generated GenBank files
+            primer_folder: Path to folder containing primer files (default: data/primers)
+            template_folder: Path to folder containing template files (default: data/templates)
+            output_folder: Path to store generated GenBank files (default: output)
         """
         # Core parameters
         self.batch_size = batch_size
 
-        # File paths
-        self.primer_folder = primer_folder
-        self.template_folder = template_folder
-        self.output_folder = output_folder
+        # File paths - resolve defaults if not provided
+        self.primer_folder = primer_folder if primer_folder is not None else get_primers_path()
+        self.template_folder = template_folder if template_folder is not None else get_templates_path()
+        self.output_folder = output_folder if output_folder is not None else get_output_path()
 
         # Console setup
         self.console = Console()
@@ -1327,7 +1328,7 @@ class BatchDesigner:
         from pathlib import Path
 
         # Construct private template directory path
-        private_template_folder = Path("data/private/templates")
+        private_template_folder = get_templates_path(private=True)
 
         # Step 1: Check if template_name is a contig and get genome name
         genome_name = None

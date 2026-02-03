@@ -42,6 +42,7 @@ from rich.table import Table
 
 from ..utils.primer_utils import design_screening_primers
 from ..utils.sequence_utils import load_sequences
+from ..utils.path_utils import get_templates_path, get_component_libraries_path
 
 
 class ReplaceDesigner:
@@ -51,22 +52,24 @@ class ReplaceDesigner:
                  upstream_homology_len: int = 200,
                  downstream_homology_len: int = 200,
                  repeat_length: int = 160,
-                 genome_file: Path = Path("data/templates/BY4741_Toronto_2012.fsa"),
-                 ura3_file: Path = Path("data/component libraries/Saccharomyces cerevisiae/URA3.fasta")):
+                 genome_file: Optional[Path] = None,
+                 ura3_file: Optional[Path] = None):
         """Initialize the ReplaceDesigner.
-        
+
         Args:
             upstream_homology_len: Length of upstream homology for recombination (default: 200)
             downstream_homology_len: Length of downstream homology for recombination (default: 200)
             repeat_length: Length of repeat sequence for marker removal (default: 160)
-            genome_file: Path to the genome file
-            ura3_file: Path to the URA3 marker file
+            genome_file: Path to the genome file (default: BY4741_Toronto_2012.fsa from data directory)
+            ura3_file: Path to the URA3 marker file (default: URA3.fasta from data directory)
         """
         self.upstream_homology_len = upstream_homology_len
         self.downstream_homology_len = downstream_homology_len
         self.repeat_length = repeat_length
-        self.genome_file = genome_file
-        self.ura3_file = ura3_file
+
+        # Resolve default paths if not provided
+        self.genome_file = genome_file if genome_file is not None else get_templates_path() / "BY4741_Toronto_2012.fsa"
+        self.ura3_file = ura3_file if ura3_file is not None else get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
         self.console = Console()
         self.session = PromptSession()
 
