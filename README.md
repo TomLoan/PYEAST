@@ -66,7 +66,7 @@ PYEAST now supports flexible data locations via:
 - Environment variable: `export PYEAST_DATA_DIR=/path/to/data`
 - Config file: `~/.pyeast/config.yaml`
 - Dev mode: Automatically uses `./data/` in git checkout
-- Default: `~/.pyeast/data/`
+- Default: `~/PYEAST/data/`
 
 For detailed installation instructions and troubleshooting, see [INSTALL.md](INSTALL.md).
 

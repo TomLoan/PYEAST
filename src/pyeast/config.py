@@ -5,7 +5,7 @@ Configuration priority (highest to lowest):
 1. Environment variables (PYEAST_DATA_DIR, PYEAST_OUTPUT_DIR)
 2. Config file (~/.pyeast/config.yaml)
 3. Dev mode detection (./data/ if running from git checkout)
-4. Default locations (~/.pyeast/data/)
+4. Default locations (~/PYEAST/data/)
 """
 
 import os
@@ -29,7 +29,7 @@ class PyeastConfig:
         1. PYEAST_DATA_DIR environment variable
         2. data_dir in config file
         3. ./data/ if in dev mode (git checkout)
-        4. ~/.pyeast/data/ as default
+        4. ~/PYEAST/data/ as default
         """
         # Priority 1: Environment variable
         env_data_dir = os.getenv('PYEAST_DATA_DIR')
@@ -50,7 +50,7 @@ class PyeastConfig:
             return (Path.cwd() / "data").resolve()
 
         # Priority 4: Default user directory
-        return (Path.home() / ".pyeast" / "data").resolve()
+        return (Path.home() / "PYEAST" / "data").resolve()
 
     def _resolve_output_dir(self) -> Path:
         """Resolve output directory location.
@@ -59,7 +59,7 @@ class PyeastConfig:
         1. PYEAST_OUTPUT_DIR environment variable
         2. output_dir in config file
         3. ./output/ if in dev mode
-        4. ~/.pyeast/output/ as default
+        4. ~/PYEAST/output/ as default
         """
         # Priority 1: Environment variable
         env_output_dir = os.getenv('PYEAST_OUTPUT_DIR')
@@ -76,7 +76,7 @@ class PyeastConfig:
             return (Path.cwd() / "output").resolve()
 
         # Priority 4: Default user directory
-        return (Path.home() / ".pyeast" / "output").resolve()
+        return (Path.home() / "PYEAST" / "output").resolve()
 
     def _load_config_file(self) -> Optional[dict]:
         """Load configuration from ~/.pyeast/config.yaml if it exists."""

@@ -973,7 +973,8 @@ def cli():
 
 @cli.command()
 @click.option('--data-dir', type=click.Path(), help='Path to existing data directory to use')
-def init(data_dir):
+@click.option('--output-dir', type=click.Path(), help='Path to output directory for results (optional)')
+def init(data_dir, output_dir):
     """Initialize PYEAST data directory configuration.
 
     This command helps set up PYEAST after installation to point to your data files.
@@ -981,6 +982,7 @@ def init(data_dir):
 
     Examples:
         pyeast init --data-dir /path/to/PYEAST/data
+        pyeast init --data-dir /path/to/data --output-dir /path/to/output
         pyeast init  # Interactive setup
     """
     from pyeast.config import get_config
@@ -996,8 +998,9 @@ def init(data_dir):
 
     if config.data_dir.exists() and not data_dir:
         console.print(f"[green]✓ Data directory already configured at {config.data_dir}[/green]")
+        console.print(f"[dim]Output directory: {config.output_dir}[/dim]")
         console.print("\n[dim]To reconfigure, use one of these methods:[/dim]")
-        console.print("[dim]  1. Set PYEAST_DATA_DIR environment variable[/dim]")
+        console.print("[dim]  1. Set PYEAST_DATA_DIR or PYEAST_OUTPUT_DIR environment variables[/dim]")
         console.print("[dim]  2. Edit ~/.pyeast/config.yaml[/dim]")
         console.print("[dim]  3. Run: pyeast init --data-dir /new/path[/dim]")
         return
@@ -1010,16 +1013,30 @@ def init(data_dir):
             console.print(f"[red]✗ Directory not found: {target}[/red]")
             raise click.Abort()
 
+        # Validate output_dir if provided
+        if output_dir:
+            output_target = Path(output_dir)
+            if not output_target.exists():
+                console.print(f"[yellow]⚠ Output directory does not exist: {output_target}[/yellow]")
+                console.print("[dim]It will be created when needed.[/dim]")
+
         # Create config file pointing to this location
         config_file = Path.home() / ".pyeast" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         import yaml
+        config_data = {'data_dir': str(target.resolve())}
+        if output_dir:
+            config_data['output_dir'] = str(Path(output_dir).resolve())
+
         with open(config_file, 'w') as f:
-            yaml.dump({'data_dir': str(target.resolve())}, f)
+            yaml.dump(config_data, f)
 
         console.print(f"[green]✓ Configured PYEAST to use data at {target}[/green]")
+        if output_dir:
+            console.print(f"[green]✓ Output directory set to {output_dir}[/green]")
         console.print(f"[dim]Config saved to: {config_file}[/dim]")
+        console.print(f"[dim]Advanced users can edit this file directly to add additional options.[/dim]")
 
     else:
         # New installation - need to get data
@@ -1031,6 +1048,7 @@ def init(data_dir):
         console.print("\n[yellow]Example:[/yellow]")
         console.print("  git clone https://github.com/TomLoan/PYEAST.git ~/PYEAST-data")
         console.print("  pyeast init --data-dir ~/PYEAST-data/data")
+        console.print("  pyeast init --data-dir ~/PYEAST-data/data --output-dir ~/my-results")
         console.print("\n[dim]Run 'pyeast init --help' for more information[/dim]")
 
 @cli.command()
@@ -1253,11 +1271,12 @@ def batch(reuse_limit):
               default = False,
               help = 'Assemble selections in a single reaction to create a library of constructs (default: False)')
 def gg(library):
-    """Design golden gate cloning experiments in Saccharomyces cerevisiae
+    """===Experimental===
+    Design golden gate cloning experiments in Saccharomyces cerevisiae
     \b\n
-    Supports multiplex and library type assemblies
-    Use / to seperate component names you want to multiplex with, or input /allX to select all components of type X
-    The designer can handle parts input out of order, although this can make it hard to see what you're doing and will 
+    Still being developed, use with caution. supports multiplex and library type assemblies
+    Use / to separate component names you want to multiplex , or input /allX to select all components of type X
+    The designer can handle parts input out of order, although this can make it hard to see what you're doing, and will 
     idenify the correct enzyme for the parts you've selected automatically. 
     """
     try:

@@ -74,7 +74,7 @@ class ggDesigner:
 
             is_library:
                 Bool that flags if the assembly is to be multiplexed in separate wells, or pooled to create a library.
-                Defauls to False to return separate assemblies.
+                Defaults to False to return separate assemblies.
             """
         # File paths                     # These need to be user determined.
         self.gg_plasmids = None

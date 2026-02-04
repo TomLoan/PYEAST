@@ -58,7 +58,7 @@ PYEAST looks for data in this order:
 1. **Environment variable**: `PYEAST_DATA_DIR=/path/to/data`
 2. **Config file**: `~/.pyeast/config.yaml`
 3. **Dev mode**: `./data/` (if running from git checkout)
-4. **Default**: `~/.pyeast/data/`
+4. **Default**: `~/PYEAST/data/`
 
 ### Using Data in Different Locations
 

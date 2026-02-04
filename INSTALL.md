@@ -57,7 +57,7 @@ PYEAST looks for data in this priority order:
 
 3. **Dev mode:** `./data/` (if running from git checkout)
 
-4. **Default:** `~/.pyeast/data/`
+4. **Default:** `~/PYEAST/data/`
 
 ### Using the Init Command
 
