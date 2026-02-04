@@ -997,7 +997,7 @@ def init(data_dir, output_dir):
         return
 
     if config.data_dir.exists() and not data_dir:
-        console.print(f"[green]✓ Data directory already configured at {config.data_dir}[/green]")
+        console.print(f"[green] Data directory already configured at {config.data_dir}[/green]")
         console.print(f"[dim]Output directory: {config.output_dir}[/dim]")
         console.print("\n[dim]To reconfigure, use one of these methods:[/dim]")
         console.print("[dim]  1. Set PYEAST_DATA_DIR or PYEAST_OUTPUT_DIR environment variables[/dim]")
@@ -1017,7 +1017,7 @@ def init(data_dir, output_dir):
         if output_dir:
             output_target = Path(output_dir)
             if not output_target.exists():
-                console.print(f"[yellow]⚠ Output directory does not exist: {output_target}[/yellow]")
+                console.print(f"[yellow] Output directory does not exist: {output_target}[/yellow]")
                 console.print("[dim]It will be created when needed.[/dim]")
 
         # Create config file pointing to this location
@@ -1032,9 +1032,9 @@ def init(data_dir, output_dir):
         with open(config_file, 'w') as f:
             yaml.dump(config_data, f)
 
-        console.print(f"[green]✓ Configured PYEAST to use data at {target}[/green]")
+        console.print(f"[green] Configured PYEAST to use data at {target}[/green]")
         if output_dir:
-            console.print(f"[green]✓ Output directory set to {output_dir}[/green]")
+            console.print(f"[green] Output directory set to {output_dir}[/green]")
         console.print(f"[dim]Config saved to: {config_file}[/dim]")
         console.print(f"[dim]Advanced users can edit this file directly to add additional options.[/dim]")
 
