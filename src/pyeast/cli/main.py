@@ -992,7 +992,7 @@ def init(data_dir, output_dir):
 
     # Check if already set up
     if config.data_dir.exists() and is_dev_mode():
-        console.print(f"[green]✓ Running in dev mode, using {config.data_dir}[/green]")
+        console.print(f"[green] Running in dev mode, using {config.data_dir}[/green]")
         console.print("[dim]Data directory detected in current git checkout.[/dim]")
         return
 
