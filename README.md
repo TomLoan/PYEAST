@@ -31,14 +31,46 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 git clone https://github.com/TomLoan/PYEAST.git
 ```
 
-### Using PYEAST 
+### Using PYEAST
 
-Run PYEAST in Command line
+Run PYEAST in Command line:
 ```shell
 uv run pyeast
 ```
-uv will handle the package management and create athe required virtual environment in the local directory. 
+uv will handle the package management and create the required virtual environment in the local directory.
 Once this process is complete a range of commands will be printed to the terminal, use uv run pyeast command --help for more information on running each command
+
+## Installation
+
+PYEAST can be installed in multiple ways:
+
+### Quick Install (Development Mode)
+```bash
+git clone https://github.com/TomLoan/PYEAST.git
+cd PYEAST
+uv pip install -e .  # or: pip install -e .
+```
+
+### Install from GitHub
+```bash
+pip install git+https://github.com/TomLoan/PYEAST.git
+
+# Configure data directory
+git clone https://github.com/TomLoan/PYEAST.git ~/PYEAST-data
+pyeast init --data-dir ~/PYEAST-data/data
+```
+
+### Configuration
+
+PYEAST now supports flexible data locations via:
+- Environment variable: `export PYEAST_DATA_DIR=/path/to/data`
+- Config file: `~/.pyeast/config.yaml`
+- Dev mode: Automatically uses `./data/` in git checkout
+- Default: `~/PYEAST/data/`
+
+For detailed installation instructions and troubleshooting, see [INSTALL.md](INSTALL.md).
+
+---
 
 Pyeast provides  useful functions for  your Saccharomyces cerevisiae cloning needs: 
 tar: Transformation assisted recombination is a cloning method that relies on S. cerevisiaes native capcity for homologous recombination to create new plasmids out of PCR products using homology added to the ends of PCR primers. 

@@ -47,6 +47,57 @@ PYEAST automatically searches both locations and combines the results:
 
 **You'll never see any indication of whether data is public or private** - PYEAST just shows you everything you have access to.
 
+## Data Location Configuration
+
+As of version 1.1.1, PYEAST supports flexible data directory locations. You can install PYEAST separately from its data.
+
+### Data Location Priority
+
+PYEAST looks for data in this order:
+
+1. **Environment variable**: `PYEAST_DATA_DIR=/path/to/data`
+2. **Config file**: `~/.pyeast/config.yaml`
+3. **Dev mode**: `./data/` (if running from git checkout)
+4. **Default**: `~/PYEAST/data/`
+
+### Using Data in Different Locations
+
+If you installed PYEAST via `pip install` (not from the git repository), you can configure where data lives:
+
+#### Option 1: Environment Variable
+```bash
+export PYEAST_DATA_DIR=/path/to/PYEAST/data
+pyeast tar
+```
+
+#### Option 2: Config File
+Create `~/.pyeast/config.yaml`:
+```yaml
+data_dir: /path/to/PYEAST/data
+output_dir: /path/to/output  # optional
+```
+
+#### Option 3: Init Command
+```bash
+# Point PYEAST to existing data directory
+pyeast init --data-dir /path/to/PYEAST/data
+```
+
+#### Option 4: Git Checkout (Dev Mode)
+When running from a git checkout, PYEAST automatically uses `./data/`:
+```bash
+git clone https://github.com/TomLoan/PYEAST.git
+cd PYEAST
+pip install -e .
+pyeast tar  # Automatically uses ./data/
+```
+
+This flexibility means you can:
+- Install PYEAST once, use it with multiple data directories
+- Keep code updated via pip while maintaining stable data
+- Share a single PYEAST installation across a team with different data sets
+- Separate proprietary data from the PYEAST codebase
+
 ## Getting Started
 
 ### Using PYEAST with Public Data Only

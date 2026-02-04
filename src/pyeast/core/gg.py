@@ -48,6 +48,7 @@ from ..utils.sequence_utils import (
     get_templates,
     load_sequences,
 )
+from ..utils.path_utils import get_templates_path, get_private_equivalent
 
 
 class ggDesigner:
@@ -57,27 +58,27 @@ class ggDesigner:
     """
 
     def __init__(self,
-                 template_folder: Path = Path("data/templates"),
+                 template_folder: Optional[Path] = None,
                  instruments: List = ['Janus', 'epMotion', 'Hamilton', 'Human'],
                  is_library: bool = False
                  ):
-        """Inintialise a new gg_lvl1 designer. 
-        
+        """Inintialise a new gg_lvl1 designer.
+
         Args:
-            template_folder: 
+            template_folder:
                 Path to a fold where the file catalogging plasmid positions in 96 well plates,
                  TemPlates.xlsx, is stored. Defaults to data/templates.
-            
-            Instruments: 
+
+            Instruments:
                 List of available instruments, each requires implementation so shouldn't be input by the user.
-            
-            is_library: 
+
+            is_library:
                 Bool that flags if the assembly is to be multiplexed in separate wells, or pooled to create a library.
-                Defauls to False to return separate assemblies. 
+                Defaults to False to return separate assemblies.
             """
         # File paths                     # These need to be user determined.
         self.gg_plasmids = None
-        self.template_folder = template_folder
+        self.template_folder = template_folder if template_folder is not None else get_templates_path()
 
         # state storage
         self.instruments = instruments
@@ -284,11 +285,7 @@ class ggDesigner:
         public_plasmids = self.gg_plasmids
 
         # Construct private plasmids path
-        try:
-            relative_path = public_plasmids.relative_to("data")
-            private_plasmids = Path("data/private") / relative_path
-        except ValueError:
-            private_plasmids = Path("data/private") / public_plasmids.name
+        private_plasmids = get_private_equivalent(public_plasmids)
 
         # Collect plasmid files from both locations
         plasmid_files = []
@@ -652,7 +649,7 @@ class ggDesigner:
         from pathlib import Path
 
         # Construct private template directory path
-        private_template_folder = Path("data/private/templates")
+        private_template_folder = get_templates_path(private=True)
 
         # Check both public and private genome mapping files
         for search_dir in [self.template_folder, private_template_folder]:

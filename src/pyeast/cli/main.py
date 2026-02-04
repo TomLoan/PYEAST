@@ -45,6 +45,13 @@ from ..core.integration import IntegrationDesigner
 from ..core.replace import ReplaceDesigner
 from ..core.tar import TARDesigner
 from ..utils.visualisation import save_figure, visualise_genbank
+from ..utils.path_utils import (
+    get_output_path,
+    get_component_libraries_path,
+    get_primers_path,
+    get_templates_path,
+    ensure_output_dir_exists
+)
 
 console = Console()
 
@@ -73,10 +80,9 @@ def get_output_prefix() -> Path:
         Use .name property to get just the filename without path.
     """
     session = PromptSession()
-    output_dir = Path("output")
+    output_dir = ensure_output_dir_exists()
 
-    # Ensure output directory exists
-    output_dir.mkdir(exist_ok=True)
+    # Output directory is ensured by ensure_output_dir_exists()
 
     while True:
         try:
@@ -187,8 +193,8 @@ def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> 
 def get_component_dir() -> Path:
     """Get component directory with simple autocompletion, including private libraries"""
     # Check both public and private base directories
-    base_dir = Path("data/component libraries")
-    private_base_dir = Path("data/private/component libraries")
+    base_dir = get_component_libraries_path()
+    private_base_dir = get_component_libraries_path(private=True)
 
     if not base_dir.exists():
         console.print("[red]Error: Default components directory not found[/red]")
@@ -280,12 +286,12 @@ def run_tar_interactive_mode(designer: TARDesigner):
 
             # Check primer locations
             task_id = progress.add_task("Checking primer locations...", total=None)
-            designer.check_primer_locations(Path("data/primers"))
+            designer.check_primer_locations(get_primers_path())
             progress.update(task_id, completed=True)
 
             # Find templates
             task_id = progress.add_task("Finding templates...", total=None)
-            designer.find_templates(Path("data/templates"))
+            designer.find_templates(get_templates_path())
             progress.update(task_id, completed=True)
 
             # Rationalize selections
@@ -406,12 +412,12 @@ def run_integration_interactive_mode(designer: IntegrationDesigner):
 
             # Find existing primers
             task_id = progress.add_task("Checking primer locations...", total=None)
-            designer.check_primer_locations(Path("data/primers"))
+            designer.check_primer_locations(get_primers_path())
             progress.update(task_id, completed=True)
 
             # Find templates
             task_id = progress.add_task("Finding templates...", total=None)
-            designer.find_templates(Path("data/templates"))
+            designer.find_templates(get_templates_path())
             progress.update(task_id, completed=True)
 
             # Rationalize selections
@@ -961,9 +967,89 @@ def run_gg_interactive_mode(designer: ggDesigner):
 @click.group()
 def cli():
     """PYeast: Python tools for yeast genetic engineering
-    
+
     Created by Tom Loan"""
     pass
+
+@cli.command()
+@click.option('--data-dir', type=click.Path(), help='Path to existing data directory to use')
+@click.option('--output-dir', type=click.Path(), help='Path to output directory for results (optional)')
+def init(data_dir, output_dir):
+    """Initialize PYEAST data directory configuration.
+
+    This command helps set up PYEAST after installation to point to your data files.
+    If you're running from a git checkout, this is usually not needed.
+
+    Examples:
+        pyeast init --data-dir /path/to/PYEAST/data
+        pyeast init --data-dir /path/to/data --output-dir /path/to/output
+        pyeast init  # Interactive setup
+    """
+    from pyeast.config import get_config
+    from pyeast.utils.path_utils import is_dev_mode
+
+    config = get_config()
+
+    # Check if already set up
+    if config.data_dir.exists() and is_dev_mode():
+        console.print(f"[green] Running in dev mode, using {config.data_dir}[/green]")
+        console.print("[dim]Data directory detected in current git checkout.[/dim]")
+        return
+
+    if config.data_dir.exists() and not data_dir:
+        console.print(f"[green] Data directory already configured at {config.data_dir}[/green]")
+        console.print(f"[dim]Output directory: {config.output_dir}[/dim]")
+        console.print("\n[dim]To reconfigure, use one of these methods:[/dim]")
+        console.print("[dim]  1. Set PYEAST_DATA_DIR or PYEAST_OUTPUT_DIR environment variables[/dim]")
+        console.print("[dim]  2. Edit ~/.pyeast/config.yaml[/dim]")
+        console.print("[dim]  3. Run: pyeast init --data-dir /new/path[/dim]")
+        return
+
+    # Interactive setup
+    if data_dir:
+        # User provided existing data location
+        target = Path(data_dir)
+        if not target.exists():
+            console.print(f"[red]✗ Directory not found: {target}[/red]")
+            raise click.Abort()
+
+        # Validate output_dir if provided
+        if output_dir:
+            output_target = Path(output_dir)
+            if not output_target.exists():
+                console.print(f"[yellow] Output directory does not exist: {output_target}[/yellow]")
+                console.print("[dim]It will be created when needed.[/dim]")
+
+        # Create config file pointing to this location
+        config_file = Path.home() / ".pyeast" / "config.yaml"
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+
+        import yaml
+        config_data = {'data_dir': str(target.resolve())}
+        if output_dir:
+            config_data['output_dir'] = str(Path(output_dir).resolve())
+
+        with open(config_file, 'w') as f:
+            yaml.dump(config_data, f)
+
+        console.print(f"[green] Configured PYEAST to use data at {target}[/green]")
+        if output_dir:
+            console.print(f"[green] Output directory set to {output_dir}[/green]")
+        console.print(f"[dim]Config saved to: {config_file}[/dim]")
+        console.print(f"[dim]Advanced users can edit this file directly to add additional options.[/dim]")
+
+    else:
+        # New installation - need to get data
+        console.print("\n[bold]PYEAST Data Setup[/bold]")
+        console.print("\nPYEAST requires data files (component libraries, templates, etc.)")
+        console.print("\n[cyan]Options:[/cyan]")
+        console.print("  1. Clone the git repository and point to its data/")
+        console.print("  2. Specify an existing data directory with --data-dir")
+        console.print("\n[yellow]Example:[/yellow]")
+        console.print("  git clone https://github.com/TomLoan/PYEAST.git ~/PYEAST-data")
+        console.print("  pyeast init --data-dir ~/PYEAST-data/data")
+        console.print("  pyeast init --data-dir ~/PYEAST-data/data --output-dir ~/my-results")
+        console.print("\n[dim]Run 'pyeast init --help' for more information[/dim]")
 
 @cli.command()
 @click.option('--homology_length',
@@ -1035,12 +1121,12 @@ def integrate(homology_length):
               help='Length of repeat sequence for marker removal (default: 80)')
 @click.option('--genome_file',
               type=click.Path(exists=True, path_type=Path),
-              default=Path("data/templates/BY4741_Toronto_2012.fsa"),
-              help='Path to genome file (default: BY4741_Toronto_2012.fsa)')
+              default=None,
+              help='Path to genome file (default: BY4741_Toronto_2012.fsa from data directory)')
 @click.option('--ura3_file',
               type=click.Path(exists=True, path_type=Path),
-              default=Path("data/component libraries/Saccharomyces cerevisiae/URA3.fasta"),
-              help='Path to URA3 marker file. Default /data/component libraries/Saccharomyces cerevisiae/URA3.fasta')
+              default=None,
+              help='Path to URA3 marker file (default: URA3.fasta from data/component libraries/Saccharomyces cerevisiae/)')
 def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome_file, ura3_file):
     """Design scarless deletions in Saccharomyces cerevisiae.  
     \b\n
@@ -1061,6 +1147,12 @@ def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome
     5' =====up====repeat=== 3'                  gDNA
     """
     try:
+        # Set defaults if not provided
+        if genome_file is None:
+            genome_file = get_templates_path() / "BY4741_Toronto_2012.fsa"
+        if ura3_file is None:
+            ura3_file = get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
+
         designer = DeletionDesigner(
             upstream_homology_len=upstream_homology_len,
             downstream_homology_len=downstream_homology_len,
@@ -1090,12 +1182,12 @@ def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome
               help='Length of repeat sequence for marker removal (default: 80)')
 @click.option('--genome_file',
               type=click.Path(exists=True, path_type=Path),
-              default=Path("data/templates/BY4741_Toronto_2012.fsa"),
-              help='Path to genome file (default: BY4741_Toronto_2012.fsa)')
+              default=None,
+              help='Path to genome file (default: BY4741_Toronto_2012.fsa from data directory)')
 @click.option('--ura3_file',
               type=click.Path(exists=True, path_type=Path),
-              default=Path("data/component libraries/Saccharomyces cerevisiae/URA3.fasta"),
-              help='Path to URA3 marker file. Default /data/component libraries/Saccharomyces cerevisiae/URA3.fasta')
+              default=None,
+              help='Path to URA3 marker file (default: URA3.fasta from data/component libraries/Saccharomyces cerevisiae/)')
 def replace(upstream_homology_len, downstream_homology_len, repeat_length, genome_file, ura3_file):
     """Design pop-in/pop-out replacements in Saccharomyces cerevisiae
     \b\n
@@ -1116,9 +1208,15 @@ def replace(upstream_homology_len, downstream_homology_len, repeat_length, genom
                       ||
                 **FOA counter selection**
                       \\/
-    5'==up==replacement==repeate===3'                           gDNA   
+    5'==up==replacement==repeate===3'                           gDNA
     """
     try:
+        # Set defaults if not provided
+        if genome_file is None:
+            genome_file = get_templates_path() / "BY4741_Toronto_2012.fsa"
+        if ura3_file is None:
+            ura3_file = get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
+
         designer = ReplaceDesigner(
             upstream_homology_len=upstream_homology_len,
             downstream_homology_len=downstream_homology_len,
@@ -1173,11 +1271,12 @@ def batch(reuse_limit):
               default = False,
               help = 'Assemble selections in a single reaction to create a library of constructs (default: False)')
 def gg(library):
-    """Design golden gate cloning experiments in Saccharomyces cerevisiae
+    """===Experimental===
+    Design golden gate cloning experiments in Saccharomyces cerevisiae
     \b\n
-    Supports multiplex and library type assemblies
-    Use / to seperate component names you want to multiplex with, or input /allX to select all components of type X
-    The designer can handle parts input out of order, although this can make it hard to see what you're doing and will 
+    Still being developed, use with caution. supports multiplex and library type assemblies
+    Use / to separate component names you want to multiplex , or input /allX to select all components of type X
+    The designer can handle parts input out of order, although this can make it hard to see what you're doing, and will 
     idenify the correct enzyme for the parts you've selected automatically. 
     """
     try:

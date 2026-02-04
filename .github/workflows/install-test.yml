@@ -25,12 +25,24 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
       
-      - name: Verify PyEAST installs and runs
+      - name: Install PYEAST
         run: |
           uv sync
+
+      - name: Test CLI help commands
+        run: |
           uv run pyeast --help
           uv run pyeast tar --help
           uv run pyeast integrate --help
           uv run pyeast delete --help
           uv run pyeast replace --help
           uv run pyeast batch --help
+          uv run pyeast gg --help
+
+      - name: Test init command
+        run: |
+          uv run pyeast init --data-dir ./data
+
+      - name: Run test suite
+        run: |
+          uv run pytest tests/ -v --cov=src/pyeast --cov-report=term-missing

@@ -36,6 +36,8 @@ from Bio.Seq import Seq
 from Bio.SeqFeature import CompoundLocation, FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
 
+from .path_utils import get_private_equivalent
+
 
 def load_sequences(directory: str) -> Dict[str, SeqRecord]:
     """
@@ -58,11 +60,7 @@ def load_sequences(directory: str) -> Dict[str, SeqRecord]:
     public_dir = Path(directory)
 
     # Construct private directory path
-    try:
-        relative_path = public_dir.relative_to("data")
-        private_dir = Path("data/private") / relative_path
-    except ValueError:
-        private_dir = Path("data/private") / public_dir.name
+    private_dir = get_private_equivalent(public_dir)
 
     # Track if we found at least one directory
     found_any = False
@@ -123,11 +121,7 @@ def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]
     public_dir = Path(directory)
 
     # Construct private directory path
-    try:
-        relative_path = public_dir.relative_to("data")
-        private_dir = Path("data/private") / relative_path
-    except ValueError:
-        private_dir = Path("data/private") / public_dir.name
+    private_dir = get_private_equivalent(public_dir)
 
     # Load templates from both public and private directories
     for search_dir in [public_dir, private_dir]:

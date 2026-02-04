@@ -29,6 +29,7 @@ Primer utilities for PYEAST.
 
 
 import os
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 import pandas as pd
@@ -36,6 +37,8 @@ import primer3
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqUtils import MeltingTemp as mt
+
+from .path_utils import get_private_equivalent
 
 
 def design_screening_primers(sequence, target_start, target_end, primer_length=20, product_size_range=(500,1000)):
@@ -153,11 +156,7 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
     public_dir = Path(directory)
 
     # Construct private directory path
-    try:
-        relative_path = public_dir.relative_to("data")
-        private_dir = Path("data/private") / relative_path
-    except ValueError:
-        private_dir = Path("data/private") / public_dir.name
+    private_dir = get_private_equivalent(public_dir)
 
     # Search both public and private directories for Excel files
     for search_dir in [public_dir, private_dir]:
