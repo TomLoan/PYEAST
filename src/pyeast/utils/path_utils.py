@@ -18,6 +18,9 @@ def get_data_path(subdirectory: str = "") -> Path:
     Returns:
         Resolved absolute path
 
+    Raises:
+        ValueError: If subdirectory contains path traversal attempts or escapes base directory
+
     Examples:
         >>> get_data_path()  # Base data directory
         >>> get_data_path("component libraries")
@@ -25,7 +28,21 @@ def get_data_path(subdirectory: str = "") -> Path:
     """
     config = get_config()
     base = config.data_dir
-    return base / subdirectory if subdirectory else base
+
+    if subdirectory:
+        # Validate subdirectory doesn't contain path traversal attempts
+        if ".." in subdirectory or subdirectory.startswith(("/", "\\")):
+            raise ValueError(f"Invalid subdirectory path: {subdirectory}")
+
+    result = base / subdirectory if subdirectory else base
+
+    # Ensure result stays within base directory (catches symlinks too)
+    try:
+        result.resolve().relative_to(base.resolve())
+    except ValueError:
+        raise ValueError(f"Path {result} escapes data directory {base}")
+
+    return result
 
 
 def get_output_path(subdirectory: str = "") -> Path:
@@ -37,13 +54,30 @@ def get_output_path(subdirectory: str = "") -> Path:
     Returns:
         Resolved absolute path
 
+    Raises:
+        ValueError: If subdirectory contains path traversal attempts or escapes base directory
+
     Examples:
         >>> get_output_path()  # Base output directory
         >>> get_output_path("project1")
     """
     config = get_config()
     base = config.output_dir
-    return base / subdirectory if subdirectory else base
+
+    if subdirectory:
+        # Validate subdirectory doesn't contain path traversal attempts
+        if ".." in subdirectory or subdirectory.startswith(("/", "\\")):
+            raise ValueError(f"Invalid subdirectory path: {subdirectory}")
+
+    result = base / subdirectory if subdirectory else base
+
+    # Ensure result stays within base directory (catches symlinks too)
+    try:
+        result.resolve().relative_to(base.resolve())
+    except ValueError:
+        raise ValueError(f"Path {result} escapes output directory {base}")
+
+    return result
 
 
 def get_component_libraries_path(private: bool = False) -> Path:
@@ -120,8 +154,15 @@ def ensure_output_dir_exists(subdirectory: str = "") -> Path:
 
     Returns:
         Path to the output directory
+
+    Raises:
+        ValueError: If path exists but is not a directory
     """
     output_path = get_output_path(subdirectory)
+
+    if output_path.exists() and not output_path.is_dir():
+        raise ValueError(f"{output_path} exists but is not a directory")
+
     output_path.mkdir(parents=True, exist_ok=True)
     return output_path
 
@@ -137,6 +178,9 @@ def get_private_equivalent(public_path: Path) -> Path:
 
     Returns:
         Equivalent path in private data directory
+
+    Raises:
+        ValueError: If public_path is not within the data directory
     """
     config = get_config()
     data_dir = config.data_dir
@@ -146,5 +190,5 @@ def get_private_equivalent(public_path: Path) -> Path:
         relative_path = public_path.relative_to(data_dir)
         return get_data_path("private") / relative_path
     except ValueError:
-        # If public_path is not relative to data_dir, just prepend private/
-        return get_data_path("private") / public_path.name
+        # Path is not within data directory - this is an error
+        raise ValueError(f"Path {public_path} is not within data directory {data_dir}")

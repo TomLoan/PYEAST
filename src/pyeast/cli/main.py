@@ -23,7 +23,6 @@ CLI program for PYEAST program.
 
 # ===========================================================================
 
-import datetime
 import io
 from datetime import datetime
 from pathlib import Path
@@ -875,12 +874,6 @@ def run_batch_interactive_mode(designer: BatchDesigner):
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise click.Abort()
 
-    except click.Abort:
-        console.print("\n[yellow]Operation cancelled[/yellow]")
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
-        raise click.Abort()
-
 def run_gg_interactive_mode(designer: ggDesigner):
     """Run TAR design in interactive mode"""
     try:
@@ -906,7 +899,7 @@ def run_gg_interactive_mode(designer: ggDesigner):
                 #console.print(assembly_order)
 
                 if not assembly_order:
-                    console.print("[yellow]No assembly selected[{]/yellow]")
+                    console.print("[yellow]No assembly selected[/yellow]")
                     return
 
                 # Get an output prefix
@@ -919,7 +912,7 @@ def run_gg_interactive_mode(designer: ggDesigner):
                     task_id = progress.add_task("Assembling selected sequences...", total = None)
                     plasmids_required = designer.get_plasmid_names()
                     assembly_sim = designer.gg_assembly(prefix)
-                    progress.update(task_id, completes = True)
+                    progress.update(task_id, completed = True)
                 if assembly_sim.errors:
                     if click.confirm("Return to part selection?"):
                         #reset state and try again
@@ -942,9 +935,9 @@ def run_gg_interactive_mode(designer: ggDesigner):
 
                     #Save the input to file for future reference
                     if len(assembly_order) == 1:
-                        assemblies_file = f'{output_path.parent}/input.txt'
+                        assemblies_file = output_path.parent / "input.txt"
                     elif len(assembly_order) > 1:
-                        assemblies_file = f'{output_path.parent}/inputs.txt'
+                        assemblies_file = output_path.parent / "inputs.txt"
 
                     with open(assemblies_file, 'w') as f:
                         f.write(tabulate(assembly_order))
@@ -992,12 +985,12 @@ def init(data_dir, output_dir):
 
     # Check if already set up
     if config.data_dir.exists() and is_dev_mode():
-        console.print(f"[green] Running in dev mode, using {config.data_dir}[/green]")
+        console.print(f"[green]Running in dev mode, using {config.data_dir}[/green]")
         console.print("[dim]Data directory detected in current git checkout.[/dim]")
         return
 
     if config.data_dir.exists() and not data_dir:
-        console.print(f"[green] Data directory already configured at {config.data_dir}[/green]")
+        console.print(f"[green]Data directory already configured at {config.data_dir}[/green]")
         console.print(f"[dim]Output directory: {config.output_dir}[/dim]")
         console.print("\n[dim]To reconfigure, use one of these methods:[/dim]")
         console.print("[dim]  1. Set PYEAST_DATA_DIR or PYEAST_OUTPUT_DIR environment variables[/dim]")
@@ -1017,7 +1010,7 @@ def init(data_dir, output_dir):
         if output_dir:
             output_target = Path(output_dir)
             if not output_target.exists():
-                console.print(f"[yellow] Output directory does not exist: {output_target}[/yellow]")
+                console.print(f"[yellow]Output directory does not exist: {output_target}[/yellow]")
                 console.print("[dim]It will be created when needed.[/dim]")
 
         # Create config file pointing to this location
@@ -1032,9 +1025,9 @@ def init(data_dir, output_dir):
         with open(config_file, 'w') as f:
             yaml.dump(config_data, f)
 
-        console.print(f"[green] Configured PYEAST to use data at {target}[/green]")
+        console.print(f"[green]Configured PYEAST to use data at {target}[/green]")
         if output_dir:
-            console.print(f"[green] Output directory set to {output_dir}[/green]")
+            console.print(f"[green]Output directory set to {output_dir}[/green]")
         console.print(f"[dim]Config saved to: {config_file}[/dim]")
         console.print(f"[dim]Advanced users can edit this file directly to add additional options.[/dim]")
 
@@ -1149,9 +1142,19 @@ def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome
     try:
         # Set defaults if not provided
         if genome_file is None:
-            genome_file = get_templates_path() / "BY4741_Toronto_2012.fsa"
+            default_genome = get_templates_path() / "BY4741_Toronto_2012.fsa"
+            if not default_genome.exists():
+                console.print(f"[red]Default genome file not found: {default_genome}[/red]")
+                console.print("[yellow]Hint: Run 'pyeast init' to configure data directory[/yellow]")
+                raise click.Abort()
+            genome_file = default_genome
         if ura3_file is None:
-            ura3_file = get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
+            default_ura3 = get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
+            if not default_ura3.exists():
+                console.print(f"[red]Default URA3 file not found: {default_ura3}[/red]")
+                console.print("[yellow]Hint: Run 'pyeast init' to configure data directory[/yellow]")
+                raise click.Abort()
+            ura3_file = default_ura3
 
         designer = DeletionDesigner(
             upstream_homology_len=upstream_homology_len,
@@ -1213,9 +1216,19 @@ def replace(upstream_homology_len, downstream_homology_len, repeat_length, genom
     try:
         # Set defaults if not provided
         if genome_file is None:
-            genome_file = get_templates_path() / "BY4741_Toronto_2012.fsa"
+            default_genome = get_templates_path() / "BY4741_Toronto_2012.fsa"
+            if not default_genome.exists():
+                console.print(f"[red]Default genome file not found: {default_genome}[/red]")
+                console.print("[yellow]Hint: Run 'pyeast init' to configure data directory[/yellow]")
+                raise click.Abort()
+            genome_file = default_genome
         if ura3_file is None:
-            ura3_file = get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
+            default_ura3 = get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
+            if not default_ura3.exists():
+                console.print(f"[red]Default URA3 file not found: {default_ura3}[/red]")
+                console.print("[yellow]Hint: Run 'pyeast init' to configure data directory[/yellow]")
+                raise click.Abort()
+            ura3_file = default_ura3
 
         designer = ReplaceDesigner(
             upstream_homology_len=upstream_homology_len,

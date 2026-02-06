@@ -59,8 +59,12 @@ def load_sequences(directory: str) -> Dict[str, SeqRecord]:
     # Convert to Path for easier manipulation
     public_dir = Path(directory)
 
-    # Construct private directory path
-    private_dir = get_private_equivalent(public_dir)
+    # Construct private directory path (if path is within data directory)
+    try:
+        private_dir = get_private_equivalent(public_dir)
+    except ValueError:
+        # Path is not within data directory, so no private equivalent exists
+        private_dir = None
 
     # Track if we found at least one directory
     found_any = False
@@ -80,7 +84,7 @@ def load_sequences(directory: str) -> Dict[str, SeqRecord]:
             raise
 
     # Load from private directory if it exists (overwrites public if same name)
-    if private_dir.exists():
+    if private_dir and private_dir.exists():
         found_any = True
         try:
             for filename in os.listdir(private_dir):
@@ -95,7 +99,10 @@ def load_sequences(directory: str) -> Dict[str, SeqRecord]:
 
     # If neither directory exists, raise error
     if not found_any:
-        logging.error(f"Directory not found: {public_dir} (also checked {private_dir})")
+        if private_dir:
+            logging.error(f"Directory not found: {public_dir} (also checked {private_dir})")
+        else:
+            logging.error(f"Directory not found: {public_dir}")
         raise FileNotFoundError(f"Directory not found: {public_dir}")
 
     return sequences
@@ -120,11 +127,16 @@ def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]
     # Convert to Path for easier manipulation
     public_dir = Path(directory)
 
-    # Construct private directory path
-    private_dir = get_private_equivalent(public_dir)
+    # Construct private directory path (if path is within data directory)
+    try:
+        private_dir = get_private_equivalent(public_dir)
+    except ValueError:
+        # Path is not within data directory, so no private equivalent exists
+        private_dir = None
 
     # Load templates from both public and private directories
-    for search_dir in [public_dir, private_dir]:
+    search_dirs = [public_dir] + ([private_dir] if private_dir else [])
+    for search_dir in search_dirs:
         if not search_dir.exists():
             continue
 

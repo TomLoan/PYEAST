@@ -284,8 +284,12 @@ class ggDesigner:
         from pathlib import Path
         public_plasmids = self.gg_plasmids
 
-        # Construct private plasmids path
-        private_plasmids = get_private_equivalent(public_plasmids)
+        # Construct private plasmids path (if path is within data directory)
+        try:
+            private_plasmids = get_private_equivalent(public_plasmids)
+        except ValueError:
+            # Path is not within data directory, so no private equivalent exists
+            private_plasmids = None
 
         # Collect plasmid files from both locations
         plasmid_files = []
@@ -296,13 +300,16 @@ class ggDesigner:
             plasmid_files.extend(list(public_plasmids.glob('*.gb')))
             plasmid_files.extend(list(public_plasmids.glob('*.gbk')))
 
-        if private_plasmids.exists():
+        if private_plasmids and private_plasmids.exists():
             found_any_dir = True
             plasmid_files.extend(list(private_plasmids.glob('*.gb')))
             plasmid_files.extend(list(private_plasmids.glob('*.gbk')))
 
         if not found_any_dir:
-            raise FileNotFoundError(f"Plasmid folder not found in {public_plasmids} or {private_plasmids}")
+            if private_plasmids:
+                raise FileNotFoundError(f"Plasmid folder not found in {public_plasmids} or {private_plasmids}")
+            else:
+                raise FileNotFoundError(f"Plasmid folder not found in {public_plasmids}")
 
         # Collect all the unique sequence names from all assemblies
         all_part_names = set()

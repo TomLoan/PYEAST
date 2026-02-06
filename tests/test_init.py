@@ -359,8 +359,8 @@ class TestDevModeDetection:
 class TestConfigFileHandling:
     """Test config file reading and error handling."""
 
-    def test_invalid_yaml_ignored(self, isolated_config):
-        """Test that invalid YAML in config file is silently ignored."""
+    def test_invalid_yaml_emits_warning(self, isolated_config):
+        """Test that invalid YAML in config file emits warning and falls back to defaults."""
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -368,16 +368,17 @@ class TestConfigFileHandling:
         with open(config_file, 'w') as f:
             f.write("this is not: valid: yaml: [[[")
 
-        # Should not crash, should use default
-        reset_config()
-        config = get_config()
+        # Should emit warning about config loading failure
+        with pytest.warns(UserWarning, match="Could not load config file"):
+            reset_config()
+            config = get_config()
 
-        # Should use default path
+        # Should gracefully fall back to default path
         expected = (isolated_config['home'] / "PYEAST" / "data").resolve()
         assert config.data_dir == expected
 
     def test_missing_config_file_ok(self, isolated_config):
-        """Test that missing config file is OK."""
+        """Test that missing config file is OK. Generates a warning"""
         # Ensure config file doesn't exist
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         assert not config_file.exists()
