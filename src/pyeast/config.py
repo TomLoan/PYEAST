@@ -85,8 +85,10 @@ class PyeastConfig:
             try:
                 with open(config_file, 'r') as f:
                     return yaml.safe_load(f)
-            except Exception:
-                # Silently ignore config file errors
+            except (yaml.YAMLError, IOError, PermissionError) as e:
+                # Config file exists but couldn't be loaded - warn user
+                import warnings
+                warnings.warn(f"Could not load config file {config_file}: {e}")
                 pass
         return None
 

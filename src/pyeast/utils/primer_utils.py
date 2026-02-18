@@ -155,11 +155,16 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
     # Convert to Path for easier manipulation
     public_dir = Path(directory)
 
-    # Construct private directory path
-    private_dir = get_private_equivalent(public_dir)
+    # Construct private directory path (if path is within data directory)
+    try:
+        private_dir = get_private_equivalent(public_dir)
+    except ValueError:
+        # Path is not within data directory, so no private equivalent exists
+        private_dir = None
 
     # Search both public and private directories for Excel files
-    for search_dir in [public_dir, private_dir]:
+    search_dirs = [public_dir] + ([private_dir] if private_dir else [])
+    for search_dir in search_dirs:
         if not search_dir.exists():
             continue
 
