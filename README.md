@@ -1,7 +1,7 @@
 [![DOI](https://zenodo.org/badge/946400824.svg)](https://doi.org/10.5281/zenodo.15393309)
 [![Installation Test](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml/badge.svg)](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml)
 
-# PYEAST v1.1.1
+# PYEAST v1.1
 
 ## Set of tools for yeast cloning, built on the CSIRO uv-python template. 
 ## Quick start:
@@ -82,7 +82,7 @@ batch: regenate instructions files for previously designed tar and integrate com
 For more details see our [pre-print](https://doi.org/10.1101/2025.05.19.655004) on BioRxiv 
 
 
-## Version 1.1 Adds support for other liquid handling robots and for MoClo Golden gate assemblies. 
+## Version 1.1 Adds support for other liquid handling robots and beta support for MoClo Golden gate assemblies 
 
 The following Kits come preloaded: 
 - Yeast ToolKit: [Addgene](https://www.addgene.org/kits/moclo-ytk/) from [Lee at al, 2015](http://doi.org/10.1021/sb500366v)
