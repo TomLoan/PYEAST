@@ -178,9 +178,10 @@ terraform*
 *.pem
 license-check.txt
 
-# keep data dir, even if empty
-!./data/
+# data/private/ excluded — private sequences should not be committed
 data/private/
+# TODO: once data/ has been migrated to the data-only repo and removed here, add:
+data/
 Batch instructions/
 output/
 .ruff_cache

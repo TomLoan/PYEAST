@@ -4,40 +4,41 @@ PYEAST can be installed in several ways depending on your use case.
 
 ## Quick Start (Recommended for Most Users)
 
-### Option 1: Development Installation
+### Option 1: Install from GitHub (standard)
 
-Clone the repository and install in editable mode:
+Install PYEAST, then run `pyeast init` to automatically download the data:
 
 ```bash
-# Clone the repository
+pip install git+https://github.com/TomLoan/PYEAST.git
+
+# Downloads data to ~/.pyeast/data-repo/ and configures automatically
+pyeast init
+```
+
+### Option 2: Use an existing data directory
+
+If you have already cloned the data repository elsewhere:
+
+```bash
+pip install git+https://github.com/TomLoan/PYEAST.git
+
+# Point PYEAST at your existing data
+pyeast init --data-dir /path/to/PYEAST_data/data
+```
+
+### Option 3: Development Installation
+
+Clone the code repository and install in editable mode, then set up data:
+
+```bash
 git clone https://github.com/TomLoan/PYEAST.git
 cd PYEAST
 
 # Install with uv (recommended)
 uv pip install -e .
 
-# Or install with pip
-pip install -e .
-```
-
-Data will automatically be found in `./data/` when running from the repository directory.
-
-### Option 2: Install from GitHub
-
-Install directly from GitHub without cloning:
-
-```bash
-pip install git+https://github.com/TomLoan/PYEAST.git
-```
-
-After installation, set up data directory:
-
-```bash
-# Clone repo separately for data
-git clone https://github.com/TomLoan/PYEAST.git ~/PYEAST-data
-
-# Configure PYEAST to use this data
-pyeast init --data-dir ~/PYEAST-data/data
+# Set up data
+pyeast init
 ```
 
 ## Configuration
@@ -55,19 +56,20 @@ PYEAST looks for data in this priority order:
    output_dir: /path/to/output  # optional
    ```
 
-3. **Dev mode:** `./data/` (if running from git checkout)
-
-4. **Default:** `~/PYEAST/data/`
+3. **Default:** `~/PYEAST/data/`
 
 ### Using the Init Command
 
-The `pyeast init` command helps configure data paths:
+The `pyeast init` command configures data paths:
 
 ```bash
-# Point to existing data directory
-pyeast init --data-dir /path/to/PYEAST/data
+# Auto-download data repository to ~/.pyeast/data-repo/
+pyeast init
 
-# Check current configuration
+# Point to an existing data directory
+pyeast init --data-dir /path/to/PYEAST_data/data
+
+# Check or update current configuration
 pyeast init
 ```
 
@@ -208,14 +210,15 @@ uv sync
 # Install pre-commit hooks
 uv run pre-commit install
 
+# Set up data
+pyeast init
+
 # Run tests
 uv run pytest tests/ -v
 
 # Run with coverage
 uv run pytest tests/ --cov=src/pyeast --cov-report=html
 ```
-
-Data will automatically be found in `./data/` when running from the repository.
 
 ## Getting Help
 

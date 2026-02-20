@@ -1,8 +1,6 @@
 """Path resolution utilities for PYEAST.
 
-This module provides helper functions for resolving data and output paths
-in a way that works both in development mode (git checkout) and when
-installed as a package.
+This module provides helper functions for resolving data and output paths.
 """
 
 from pathlib import Path
@@ -23,7 +21,7 @@ def get_data_path(subdirectory: str = "") -> Path:
 
     Examples:
         >>> get_data_path()  # Base data directory
-        >>> get_data_path("component libraries")
+        >>> get_data_path("component_libraries")
         >>> get_data_path("templates")
     """
     config = get_config()
@@ -90,8 +88,8 @@ def get_component_libraries_path(private: bool = False) -> Path:
         Path to component libraries directory
     """
     if private:
-        return get_data_path("private/component libraries")
-    return get_data_path("component libraries")
+        return get_data_path("private/component_libraries")
+    return get_data_path("component_libraries")
 
 
 def get_integration_sites_path(private: bool = False) -> Path:
@@ -104,8 +102,8 @@ def get_integration_sites_path(private: bool = False) -> Path:
         Path to integration sites directory
     """
     if private:
-        return get_data_path("private/integration sites")
-    return get_data_path("integration sites")
+        return get_data_path("private/integration_sites")
+    return get_data_path("integration_sites")
 
 
 def get_primers_path(private: bool = False) -> Path:
@@ -136,16 +134,6 @@ def get_templates_path(private: bool = False) -> Path:
     return get_data_path("templates")
 
 
-def is_dev_mode() -> bool:
-    """Check if running in development mode (git checkout).
-
-    Returns:
-        True if running from git checkout, False otherwise
-    """
-    config = get_config()
-    return config.is_dev_mode
-
-
 def ensure_output_dir_exists(subdirectory: str = "") -> Path:
     """Ensure output directory exists, creating it if necessary.
 
@@ -170,8 +158,8 @@ def ensure_output_dir_exists(subdirectory: str = "") -> Path:
 def get_private_equivalent(public_path: Path) -> Path:
     """Convert a public data path to its private equivalent.
 
-    Given a path like: /data/component libraries/YeastToolKit
-    Returns: /data/private/component libraries/YeastToolKit
+    Given a path like: /data/component_libraries/YeastToolKit
+    Returns: /data/private/component_libraries/YeastToolKit
 
     Args:
         public_path: Path within public data directory

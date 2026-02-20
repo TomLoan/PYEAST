@@ -67,7 +67,7 @@ class DeletionDesigner:
 
         # Resolve default paths if not provided
         self.genome_file = genome_file if genome_file is not None else get_templates_path() / "BY4741_Toronto_2012.fsa"
-        self.ura3_file = ura3_file if ura3_file is not None else get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
+        self.ura3_file = ura3_file if ura3_file is not None else get_component_libraries_path() / "Saccharomyces_cerevisiae" / "URA3.fasta"
         self.console = Console()
         self.session = PromptSession()
 
