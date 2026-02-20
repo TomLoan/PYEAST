@@ -57,8 +57,9 @@ Design primers for inserting a DNA construct into a specific locus in the yeast 
 
 Design cassettes for deleting or replacing genes using the scarless marker-recycling method described by [Akada et al., 2006](https://doi.org/10.1002/yea.1362).
 
-## Golden Gate / MoClo Assembly
+## Beta feature: Golden Gate / MoClo Assembly
 
+~~~~ Still in Beta, please double check outputs ~~~~
 Design Golden Gate assemblies using the MoClo standard. The following part libraries are included out of the box:
 
 | Kit | Reference |
