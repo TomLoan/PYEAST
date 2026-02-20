@@ -4,6 +4,7 @@ This module provides helper functions for resolving data and output paths.
 """
 
 from pathlib import Path
+
 from pyeast.config import get_config
 
 

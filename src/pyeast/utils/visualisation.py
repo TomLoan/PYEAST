@@ -18,7 +18,7 @@
 
 # src/pyeast/utils/visualisation.py
 """
-DNA visualisation tools for PYEAST. 
+DNA visualisation tools for PYEAST.
 """
 
 # ===========================================================================

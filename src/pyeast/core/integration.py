@@ -26,7 +26,6 @@ Integration designer for integrations of DNA sequences into the genome of S. cer
 
 
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import click
 from Bio import SeqIO
@@ -38,9 +37,9 @@ from prompt_toolkit.shortcuts import confirm
 from rich.console import Console
 from rich.table import Table
 
-from ..utils.primer_utils import design_linear_primers, get_primer_locations, rationalize_primers
-from ..utils.sequence_utils import assemble_parts_linear, get_templates, load_sequences, rationalize_templates, write_linear_instructions
-from ..utils.path_utils import get_integration_sites_path
+from pyeast.utils.path_utils import get_integration_sites_path
+from pyeast.utils.primer_utils import design_linear_primers, get_primer_locations, rationalize_primers
+from pyeast.utils.sequence_utils import assemble_parts_linear, get_templates, load_sequences, rationalize_templates, write_linear_instructions
 
 
 class IntegrationDesigner:
@@ -148,9 +147,9 @@ class IntegrationDesigner:
                 if confirm("\nCancel selection?"):
                     raise KeyboardInterrupt
 
-    def _load_int_sites(self, directory: Path = None) -> Dict[str, Tuple[SeqRecord, SeqRecord]]:
+    def _load_int_sites(self, directory: Path = None) -> dict[str, tuple[SeqRecord, SeqRecord]]:
         """Load integration sites from both public and private directories.
-        
+
         Each site should have two sequences: upstream and downstream homology.
         """
         if directory is None:
@@ -180,17 +179,17 @@ class IntegrationDesigner:
 
         return int_sites
 
-    def design_integration_primers(self) -> Dict[str, Seq]:
+    def design_integration_primers(self) -> dict[str, Seq]:
         """Design integration primers with the necesary overhangs
-        
-        uses the design_linear_primers function from primer_utils to design primers 
-        for the selected assembly sequences. 
-        
-        Returns: 
+
+        uses the design_linear_primers function from primer_utils to design primers
+        for the selected assembly sequences.
+
+        Returns:
             Dictionary mapping primer names to their sequence
-            
-        Raises: 
-            ValueError: If no sequences have been selected for assembly. 
+
+        Raises:
+            ValueError: If no sequences have been selected for assembly.
         """
 
         if not self.assembly_sequences:
@@ -205,9 +204,9 @@ class IntegrationDesigner:
             )
         return self.primers
 
-    def print_sequence_grid(self, sequences: Dict[str, SeqRecord], title: str = "Available Sequences"):
+    def print_sequence_grid(self, sequences: dict[str, SeqRecord], title: str = "Available Sequences"):
         """Print the available sequences in a grid format.
-        
+
         Args:
             sequences: Dictionary of sequences to display
             title: Title for the sequence table
@@ -226,9 +225,9 @@ class IntegrationDesigner:
 
         self.console.print(table)
 
-    def print_integration_sites(self, sites: Dict[str, Tuple[SeqRecord, SeqRecord]], title: str = "Available Integration Sites"):
+    def print_integration_sites(self, sites: dict[str, tuple[SeqRecord, SeqRecord]], title: str = "Available Integration Sites"):
         """Display integration sites in a formatted table.
-        
+
         Args:
             sites: Dictionary mapping site names to (upstream, downstream) sequence tuples
             title: Title for the table
@@ -251,14 +250,14 @@ class IntegrationDesigner:
 
     def check_primer_locations(self, primer_folder: Path) -> None:
         """Check for exisiting primers stored in plates
-        
-        Uses primer locations functions from primer_utils to find exisiting primers in 
-        IDT plate maps  and identify which primers need to be ordered. 
-        
-        Args: 
+
+        Uses primer locations functions from primer_utils to find exisiting primers in
+        IDT plate maps  and identify which primers need to be ordered.
+
+        Args:
             primer_folder: Path to folder containing primer Excel files
 
-        Raises: 
+        Raises:
             ValueError: if primers haven't been desinged yet
         """
 
@@ -270,17 +269,17 @@ class IntegrationDesigner:
             str(primer_folder)
         )
 
-    def rationalize_selections(self) -> Tuple[Dict[str, Dict], Dict[str, str]]:
+    def rationalize_selections(self) -> tuple[dict[str, dict], dict[str, str]]:
         """Rationalize primer and template selections to minimize plate usage.
-        
+
         Uses rationalization functions from primer_utils to optimize primer plate
         usage and template selections.
-        
+
         Returns:
             Tuple containing:
                 - Dictionary of rationalized primer selections
                 - Dictionary of rationalized template selections
-                
+
         Raises:
             ValueError: If primer locations or templates haven't been checked
         """
@@ -298,12 +297,12 @@ class IntegrationDesigner:
         self.rationalized_templates = rationalize_templates(self.template_dict)
 
 
-    def write_instructions(self) -> List[List[str]]:
+    def write_instructions(self) -> list[list[str]]:
         """Generate assembly instructions for the TAR cloning experiment.
-        
+
         Returns:
             List of instruction rows containing primer and template details
-            
+
         Raises:
             ValueError: If primers and templates haven't been rationalized
         """
@@ -325,13 +324,13 @@ class IntegrationDesigner:
 
     def find_templates(self, template_folder: Path) -> None:
         """Find template matches for each assembly component.
-        
+
         Uses template functions from sequence_utils to identify potential
         templates for each sequence and rationalize the selections.
-        
+
         Args:
             template_folder: Path to folder containing template files
-            
+
         Raises:
             ValueError: If no sequences have been selected for assembly
         """
@@ -341,7 +340,7 @@ class IntegrationDesigner:
         self.template_dict = get_templates(self.assembly_sequences, str(template_folder))
         #self.console.print(self.template_dict)
 
-    def display_instructions(self, instructions: List[List[str]]):
+    def display_instructions(self, instructions: list[list[str]]):
         """Display assembly instructions in a formatted table"""
         table = Table(title="Assembly Instructions")
         table.add_column("Part Name", style="bold cyan")
@@ -372,10 +371,10 @@ class IntegrationDesigner:
 
     def create_linear_assembly(self) -> SeqRecord:
         """Create the assembled sequence with all parts and primers.
-        
+
         Returns:
             SeqRecord object representing the assembled construct with features
-            
+
         Raises:
             ValueError: If no primers have been designed
         """

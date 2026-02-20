@@ -30,7 +30,7 @@ This module provides tools for designing scarless deletion cassettes in S. cerev
 
 
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -39,8 +39,8 @@ from Bio.SeqRecord import SeqRecord
 from prompt_toolkit import PromptSession
 from rich.console import Console
 
-from ..utils.primer_utils import design_screening_primers
-from ..utils.path_utils import get_templates_path, get_component_libraries_path
+from pyeast.utils.path_utils import get_component_libraries_path, get_templates_path
+from pyeast.utils.primer_utils import design_screening_primers
 
 
 class DeletionDesigner:
@@ -78,13 +78,13 @@ class DeletionDesigner:
         self.screening_primers = None
         self.product_sizes = None
 
-    def find_target_sequence(self, genome_file: Path, target_seq: str) -> Optional[Tuple[str, int, int, str]]:
+    def find_target_sequence(self, genome_file: Path, target_seq: str) -> Optional[tuple[str, int, int, str]]:
         """Locate a target sequence in the genome.
-        
+
         Args:
             genome_file: Path to the genome file
             target_seq: The DNA sequence to find
-            
+
         Returns:
             Tuple containing (chromosome_id, start, end, orientation) or None if not found
         """
@@ -102,15 +102,15 @@ class DeletionDesigner:
 
         return None
 
-    def extract_sequences(self, genome_seq: Seq, start: int, end: int, orientation: str) -> Tuple[Seq, Seq, Seq]:
+    def extract_sequences(self, genome_seq: Seq, start: int, end: int, orientation: str) -> tuple[Seq, Seq, Seq]:
         """Extract required sequences with correct orientation.
-        
+
         Args:
             genome_seq: Full genome sequence
             start: Start position of target
             end: End position of target
             orientation: Either "forward" or "reverse"
-            
+
         Returns:
             Tuple of (upstream_homology, downstream_homology, repeat)
         """
@@ -128,14 +128,14 @@ class DeletionDesigner:
 
     def make_deletion_cassette(self, genome_file: Path, ura3_file: Path) -> SeqRecord:
         """Create the deletion cassette with URA3 marker.
-        
+
         Args:
             genome_file: Path to the genome file
             ura3_file: Path to the URA3 marker file
-            
+
         Returns:
             SeqRecord object representing the deletion cassette
-            
+
         Raises:
             ValueError: If no target sequence has been found
         """
@@ -204,15 +204,15 @@ class DeletionDesigner:
         self.deletion_cassette = cassette
         return cassette
 
-    def design_screening_strategy(self, genome_file: Path) -> Tuple[str, str, Dict[str, int]]:
+    def design_screening_strategy(self, genome_file: Path) -> tuple[str, str, dict[str, int]]:
         """Design screening primers and calculate expected product sizes.
-        
+
         Args:
             genome_file: Path to the genome file
-            
+
         Returns:
             Tuple containing (forward_primer, reverse_primer, product_sizes)
-            
+
         Raises:
             ValueError: If no target sequence has been found
         """

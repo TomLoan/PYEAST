@@ -18,7 +18,7 @@
 
 # src/pyeast/utils/primer_utils.py
 """
-Primer utilities for PYEAST. 
+Primer utilities for PYEAST.
 """
 
 # ===========================================================================
@@ -30,7 +30,6 @@ Primer utilities for PYEAST.
 
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import pandas as pd
 import primer3
@@ -129,7 +128,7 @@ def design_primers(sequence, target_tm, tolerance=3):
     r_primer = adjust_primer(Seq(sequence[-50:]), False)
     return f_primer, r_primer
 
-def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[str, List], Dict[str, List]]:
+def get_primer_locations(primers: dict[str, Seq], directory: str) -> tuple[dict[str, list], dict[str, list]]:
     """
     Locate primers in IDT spec sheets within both public and private directories.
     Combines results from both locations - if a primer is found in multiple plates
@@ -147,7 +146,6 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
             - primers_found: Mapping of primer names to lists of matching locations.
             - primers_missing: Mapping of primer names to lists of missing primer information.
     """
-    from pathlib import Path
 
     primers_found = {}
     primers_missing = {}
@@ -201,7 +199,7 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
     return primers_found, primers_missing
 
 
-def rationalize_primers(primers_found: Dict[str, List],  primers_missing : Dict[str, List]) -> Dict[str, List]:
+def rationalize_primers(primers_found: dict[str, list],  primers_missing : dict[str, list]) -> dict[str, list]:
     """
     Rationalize primer selection to minimize the number of unique plates or Box used.
 
@@ -244,10 +242,10 @@ def rationalize_primers(primers_found: Dict[str, List],  primers_missing : Dict[
 
     for primer_name, primer_info_list in primers_missing.items():
         selected_primers[primer_name] = primer_info_list[0]
-    
+
     return selected_primers
 
-def add_circular_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], overhang_length: int) -> Dict[str, Seq]:
+def add_circular_overhangs(primers: dict[str, Seq], parts: list[SeqRecord], overhang_length: int) -> dict[str, Seq]:
     """
     Add overhangs to primers for yeast assembly.
 
@@ -279,7 +277,7 @@ def add_circular_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], over
 
     return oh_oligos
 
-def design_circular_primers(parts: List[SeqRecord], target_tm=50, overhang_length=25):
+def design_circular_primers(parts: list[SeqRecord], target_tm=50, overhang_length=25):
     """
     Design TAR cloning primers for a set of DNA parts.
 
@@ -301,7 +299,7 @@ def design_circular_primers(parts: List[SeqRecord], target_tm=50, overhang_lengt
 
     return add_circular_overhangs(primers, parts, overhang_length)
 
-def add_linear_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], int_site: Tuple[SeqRecord, SeqRecord], overhang_length: int) -> Dict[str, Seq]:
+def add_linear_overhangs(primers: dict[str, Seq], parts: list[SeqRecord], int_site: tuple[SeqRecord, SeqRecord], overhang_length: int) -> dict[str, Seq]:
     """
     Add overhangs to primers for linear integration assembly.
 
@@ -344,8 +342,8 @@ def add_linear_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], int_si
 
     return oh_oligos
 
-def design_linear_primers(components: List[SeqRecord], int_site: Tuple[SeqRecord, SeqRecord],
-                               target_tm: float, homology_length: int) -> Dict[str, Seq]:
+def design_linear_primers(components: list[SeqRecord], int_site: tuple[SeqRecord, SeqRecord],
+                               target_tm: float, homology_length: int) -> dict[str, Seq]:
     """
     Design primers for integrating components at a specific site.
 

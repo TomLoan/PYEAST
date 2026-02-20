@@ -18,7 +18,7 @@
 
 # src/pyeast/cli/main.py
 """"
-CLI program for PYEAST program. 
+CLI program for PYEAST program.
 """
 
 # ===========================================================================
@@ -37,20 +37,14 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 from tabulate import tabulate
 
-from ..core.batch import BatchDesigner
-from ..core.deletion import DeletionDesigner
-from ..core.gg import ggDesigner
-from ..core.integration import IntegrationDesigner
-from ..core.replace import ReplaceDesigner
-from ..core.tar import TARDesigner
-from ..utils.visualisation import save_figure, visualise_genbank
-from ..utils.path_utils import (
-    get_output_path,
-    get_component_libraries_path,
-    get_primers_path,
-    get_templates_path,
-    ensure_output_dir_exists
-)
+from pyeast.core.batch import BatchDesigner
+from pyeast.core.deletion import DeletionDesigner
+from pyeast.core.gg import ggDesigner
+from pyeast.core.integration import IntegrationDesigner
+from pyeast.core.replace import ReplaceDesigner
+from pyeast.core.tar import TARDesigner
+from pyeast.utils.path_utils import ensure_output_dir_exists, get_component_libraries_path, get_primers_path, get_templates_path
+from pyeast.utils.visualisation import save_figure, visualise_genbank
 
 console = Console()
 
@@ -60,23 +54,23 @@ _DATA_REPO_CLONE_DIR = Path.home() / ".pyeast" / "data-repo"
 
 def get_output_prefix() -> Path:
     """Get output prefix from user - creates a subfolder and returns path to files within it.
-    
+
     This function:
     1. Asks user for a name
     2. Checks if a subfolder already exists with that name
     3. If it exists, warns user and asks for confirmation to overwrite
     4. Creates a subfolder in output/ with that name
     5. Returns a Path object: output/name/name
-    
+
     Example:
         If user inputs "my_construct", this returns:
         Path("output/my_construct/my_construct")
-        
+
         Then files are saved as:
         - output/my_construct/my_construct.gb
         - output/my_construct/my_construct_primers.tsv
         etc.
-    
+
     Returns:
         Path object pointing to files within the created subfolder.
         Use .name property to get just the filename without path.
@@ -147,7 +141,7 @@ def get_output_prefix() -> Path:
 
 def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> None:
     """Ask user if they want to generate machine instructions and handle the response.
-    
+
     Args:
         designer: BatchDesigner instance with completed assembly instructions
         output_prefix: Path prefix for output files (same as human instructions)
@@ -913,7 +907,7 @@ def run_gg_interactive_mode(designer: ggDesigner):
                 # Convert to SeqRecord objects and map to plasmids
                 with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
                     task_id = progress.add_task("Assembling selected sequences...", total = None)
-                    plasmids_required = designer.get_plasmid_names()
+                    designer.get_plasmid_names()
                     assembly_sim = designer.gg_assembly(prefix)
                     progress.update(task_id, completed = True)
                 if assembly_sim.errors:
@@ -1022,6 +1016,7 @@ def init(data_dir, output_dir):
         pyeast init --data-dir /path/to/data --output-dir /path/to/output
     """
     import subprocess
+
     from pyeast.config import get_config
 
     config = get_config()
@@ -1117,7 +1112,7 @@ def integrate(homology_length):
 		||
 	**transformation**
 		\\/
-    upstream+component1==component1==...==downstream_seq                gDNA    
+    upstream+component1==component1==...==downstream_seq                gDNA
     """
 
     try:
@@ -1151,7 +1146,7 @@ def integrate(homology_length):
               default=None,
               help='Path to URA3 marker file (default: URA3.fasta from data/component_libraries/Saccharomyces_cerevisiae/)')
 def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome_file, ura3_file):
-    """Design scarless deletions in Saccharomyces cerevisiae.  
+    """Design scarless deletions in Saccharomyces cerevisiae.
     \b\n
     Mechanism:\n
     \b
@@ -1227,7 +1222,7 @@ def replace(upstream_homology_len, downstream_homology_len, repeat_length, genom
     Note URA can be positions up or downstream of ura3
     Target must be longer than both homology arms
     Mechanism:
-    
+
     \b
     5'====up==[target=====================down]==repeat==3'     gDNA
           X                                 X
@@ -1236,7 +1231,7 @@ def replace(upstream_homology_len, downstream_homology_len, repeat_length, genom
                  **transformation**
                       \\/
     5'===up==replacement==repeat==ura3==||
-                            X           ||                      gDNA              
+                            X           ||                      gDNA
                       3'==repeat==down==||
                       ||
                 **FOA counter selection**
@@ -1283,18 +1278,18 @@ def batch(reuse_limit):
     """Design batched assemblies for Saccharomyces cerevisiae transformations
     \b\n
     This command helps organize multiple DNA assemblies into efficient batches
-    for parallel processing. 
+    for parallel processing.
     \b\n
     It generates:\b\n
     - Rationalized PCR instructions minimizing redundant reactions\b\n
     - Organized batches keeping construct PCRs together\b\n
     - Machine-readable instructions for liquid handling robots\b\n
-    
+
     The input constructs must already exist as GenBank files in the output directory
-    from previous tar/integrate/replace operations. For liquid handling instructions 
-    templates should be aliquoted into the TemPlate plate, and the name added to the 
-    coresponding well in data/templates/TemPlates.xlsx 
-    
+    from previous tar/integrate/replace operations. For liquid handling instructions
+    templates should be aliquoted into the TemPlate plate, and the name added to the
+    coresponding well in data/templates/TemPlates.xlsx
+
     The GenBank files must contain:
     - misc_feature annotations for components
     - primer_bind annotations for assembly primers
@@ -1319,8 +1314,8 @@ def gg(library):
     \b\n
     Still being developed, use with caution. supports multiplex and library type assemblies
     Use / to separate component names you want to multiplex , or input /allX to select all components of type X
-    The designer can handle parts input out of order, although this can make it hard to see what you're doing, and will 
-    idenify the correct enzyme for the parts you've selected automatically. 
+    The designer can handle parts input out of order, although this can make it hard to see what you're doing, and will
+    idenify the correct enzyme for the parts you've selected automatically.
     """
     try:
         designer = ggDesigner(is_library = library)

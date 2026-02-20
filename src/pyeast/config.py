@@ -8,9 +8,10 @@ Configuration priority (highest to lowest):
 """
 
 import os
-import yaml
 from pathlib import Path
 from typing import Optional
+
+import yaml
 
 
 class PyeastConfig:
@@ -72,9 +73,9 @@ class PyeastConfig:
         config_file = Path.home() / ".pyeast" / "config.yaml"
         if config_file.exists():
             try:
-                with open(config_file, 'r') as f:
+                with open(config_file) as f:
                     return yaml.safe_load(f)
-            except (yaml.YAMLError, IOError, PermissionError) as e:
+            except (OSError, yaml.YAMLError, PermissionError) as e:
                 # Config file exists but couldn't be loaded - warn user
                 import warnings
                 warnings.warn(f"Could not load config file {config_file}: {e}")

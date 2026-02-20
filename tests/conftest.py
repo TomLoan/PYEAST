@@ -4,12 +4,10 @@ This module configures the test environment to use test fixtures
 instead of live data directories.
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import patch
-
 import sys
-import os
+from pathlib import Path
+
+import pytest
 
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))

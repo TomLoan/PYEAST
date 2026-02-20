@@ -21,7 +21,7 @@
 """
 Batch assembly designer for high-throughput DNA assembly in S. cerevisiae.
 
-This module provides tools for organizing multiple DNA assemblies into efficient 
+This module provides tools for organizing multiple DNA assemblies into efficient
 batches for parallel processing.
 """
 
@@ -34,7 +34,7 @@ batches for parallel processing.
 import csv
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 import click
 import openpyxl
@@ -50,14 +50,14 @@ from rich.console import Console
 from rich.table import Table
 from tabulate import tabulate
 
-from ..utils.primer_utils import get_primer_locations, rationalize_primers
-from ..utils.sequence_utils import get_templates, rationalize_templates
-from ..utils.path_utils import get_primers_path, get_templates_path, get_output_path
+from pyeast.utils.path_utils import get_output_path, get_primers_path, get_templates_path
+from pyeast.utils.primer_utils import get_primer_locations, rationalize_primers
+from pyeast.utils.sequence_utils import get_templates, rationalize_templates
 
 
 class BatchDesigner:
     """Designer class for batch DNA assembly experiments.
-    
+
     This class handles the organization and planning of multiple DNA assemblies
     in parallel, including primer design, template selection, and generating
     machine-readable instructions for liquid handling robots.
@@ -115,11 +115,11 @@ class BatchDesigner:
 
     def load_constructs(self) -> None:
         """Load available constructs from output directory and subfolders.
-        
+
         Searches for .gb files in:
         1. Root output directory (legacy files)
         2. Subfolders within output directory (new organized structure)
-        
+
         Only loads constructs suitable for batch processing (from tar/integrate commands).
         Automatically excludes cassettes from replace/delete commands and gg assemblies.
         """
@@ -213,7 +213,7 @@ class BatchDesigner:
     def print_construct_grid(self) -> None:
         """
         Display available constructs in a formatted table with source information.
-        
+
         Raises:
             ValueError: If no constructs have been loaded
         """
@@ -264,7 +264,7 @@ class BatchDesigner:
     def get_selections(self) -> None:
         """
         Get user selection of constructs to assemble and store them in class state.
-        
+
         Raises:
             ValueError: If no constructs have been loaded
             KeyboardInterrupt: If user cancels selection
@@ -318,14 +318,14 @@ class BatchDesigner:
     def validate_constructs(self) -> None:
         """
         Validate all selected constructs for assembly compatibility.
-        
+
         Checks that each construct:
         - Has a topology annotation
         - Has at least one part (misc_feature)
         - Each part has proper primer annotations:
             - Forward primer at start (strand=1)
             - Reverse primer at end (strand=-1)
-        
+
         Raises:
             ValueError: If no constructs have been selected
             ValueError: If any validation errors are found
@@ -413,7 +413,7 @@ class BatchDesigner:
                             "\n".join(f"  • {e}" for e in self.validation_errors))
 
 
-    def extract_components_and_primers(self, record: SeqRecord) -> Dict:
+    def extract_components_and_primers(self, record: SeqRecord) -> dict:
         """Extract component and primer information from GenBank annotations."""
         components = []
 
@@ -515,12 +515,12 @@ class BatchDesigner:
 
     def process_selected_constructs(self) -> None:
         """Process all selected constructs to extract their assembly requirements.
-        
+
         This function:
         1. Iterates through selected constructs
         2. Extracts components, primers, and sequences from each
         3. Stores all information needed for assembly instructions
-        
+
         The assembly_requirements dict will be structured as:
         {
             'construct_name': {
@@ -547,7 +547,7 @@ class BatchDesigner:
                 ]
             }
         }
-        
+
         Raises:
             ValueError: If no constructs have been selected
             ValueError: If assembly requirement extraction fails for any construct
@@ -597,13 +597,13 @@ class BatchDesigner:
 
     def find_primers_and_templates(self) -> None:
         """Find primer locations, template matches, and track required PCR reactions.
-        
+
         This function:
         1. Identifies all PCR reactions needed across assemblies
         2. Tracks reaction usage counts for batch planning
         3. Finds primer locations and template matches
         4. Rationalizes selections considering reuse limits
-        
+
         Raises:
             ValueError: If assembly requirements haven't been processed
         """
@@ -613,14 +613,14 @@ class BatchDesigner:
         # Track all required PCR reactions
         self.pcr_reactions = {}  # Dictionary to store all unique PCR reactions
 
-        def get_homology_regions(component_seq: str, f_primer_seq: str, r_primer_seq: str) -> Tuple[str, str]:
+        def get_homology_regions(component_seq: str, f_primer_seq: str, r_primer_seq: str) -> tuple[str, str]:
             """Find homology regions by checking where primers match component sequence.
-            
+
             Args:
                 component_seq: The component sequence
                 f_primer_seq: Forward primer sequence
                 r_primer_seq: Reverse primer sequence
-                
+
             Returns:
                 Tuple containing:
                     - Forward primer homology sequence
@@ -769,13 +769,13 @@ class BatchDesigner:
 
     def organize_pcr_batches(self) -> None:
         """Organize PCR reactions into efficient batches.
-        
+
         This function:
         1. Groups PCR reactions into batches of batch_size (default 96)
         2. Keeps reactions for the same construct together when possible
         3. Handles arbitarary numbers of repeated reactions needed due to reuse limits
         4. Maintains order from user's construct selection
-        
+
         The batched_reactions list will contain dictionaries with structure:
         {
             'batch_number': int,
@@ -793,7 +793,7 @@ class BatchDesigner:
             ],
             'constructs_completed': List[str]  # Constructs that can be assembled from this batch
         }
-        
+
         Raises:
             ValueError: If PCR reactions haven't been identified
             ValueError: If required templates haven't been rationalized
@@ -899,14 +899,14 @@ class BatchDesigner:
 
     def generate_human_instructions(self, output_prefix: str) -> None:
         """Generate human-readable assembly instructions and save to files.
-        
+
         Creates a table of instructions for each batch and saves to files:
         - {output_prefix}_batch_instructions.tsv: Main assembly instructions
         - {output_prefix}_missing_primers.tsv: Primers that need ordering
-        
+
         Args:
             output_prefix: Prefix for output files (path + base filename)
-        
+
         Raises:
             ValueError: If reactions haven't been batched
         """
@@ -996,13 +996,13 @@ class BatchDesigner:
 
     def generate_assembly_groups(self, output_prefix: str) -> None:
         """Generate instructions for combining PCR products into final assemblies.
-        
+
         Creates tables showing which PCR products to combine for each construct
         within each batch. Saves to file and displays in terminal.
-        
+
         Args:
             output_prefix: Prefix for output files (path + base filename)
-        
+
         Raises:
             ValueError: If batched reactions haven't been generated
         """
@@ -1111,25 +1111,25 @@ class BatchDesigner:
 
     def generate_epmotion_instructions(self, output_prefix: str, timestamp: str) -> str:
         """Generate instructions for the epMotion liquid handling robot.
-        
+
         Creates a CSV file containing transfer instructions for primers and templates
         formatted specifically for the epMotion robot. The instructions include:
         - Header information
         - Forward primer transfers
         - Reverse primer transfers
         - Template transfers
-        
+
         Column order in human_instructions:
-        [Batch, Part_name, Constructs, F_Primer, F_Plate, F_Well, 
+        [Batch, Part_name, Constructs, F_Primer, F_Plate, F_Well,
         R_Primer, R_Plate, R_Well, Template, Size, Repeat]
-        
+
         Args:
             output_prefix: Path prefix for output files (same as human instructions)
             timestamp (str): Timestamp for file naming
-            
+
         Returns:
             str: Path to the generated instructions file
-            
+
         Raises:
             ValueError: If assembly instructions haven't been generated
             ValueError: If template information is missing
@@ -1209,26 +1209,26 @@ class BatchDesigner:
         return str(output_file)
 
     def generate_janus_instructions(self, output_prefix: str, timestamp: str) -> str:
-        """"Generate instructions for the Janus liquid handling robot   
-        
+        """"Generate instructions for the Janus liquid handling robot
+
         Creates a CSV file containing transfer instructions for primers and templates
         formatted specifically for the Janus robot. The instructions include:
         - Header information
         - Forward primer transfers
         - Reverse primer transfers
         - Template transfers
-        
+
         Column order in human_instructions:
         ['construct_id', 'asperate_plate', 'asperate_well', 'destination_plate',
         'destination_well', 'transfer_volume']
-        
+
         Args:
         output_prefix: Path prefix for output files (same as human instructions)
             timestamp (str): Timestamp for file naming
-            
+
         Returns:
             str: Path to the generated instructions file
-            
+
         Raises:
             ValueError: If assembly instructions haven't been generated
             ValueError: If template information is missing
@@ -1238,8 +1238,8 @@ class BatchDesigner:
 
         # Get unique primer plate barcodes from human instructions
         # Skip header row [1:]
-        f_primer_plates = {row[4] for row in self.human_instructions[1:] if row[4] != "N/A"}
-        r_primer_plates = {row[7] for row in self.human_instructions[1:] if row[7] != "N/A"}
+        {row[4] for row in self.human_instructions[1:] if row[4] != "N/A"}
+        {row[7] for row in self.human_instructions[1:] if row[7] != "N/A"}
 
         # Combine and sort all unique plate barcodes for consistent positions
         # all_primer_plates = sorted(f_primer_plates | r_primer_plates)
@@ -1305,27 +1305,26 @@ class BatchDesigner:
         return str(janus_file)
 
 
-    def _get_template_position(self, template_name: str) -> Tuple[Optional[str], Optional[str]]:
+    def _get_template_position(self, template_name: str) -> tuple[Optional[str], Optional[str]]:
         """Find the plate and well position for a given template.
-        
+
         First checks if the template is a contig/chromosome in the genome mapping file
         to get the genome name, then looks up the genome name in TemPlates.xlsx for position.
         For non-genome templates, directly searches TemPlates.xlsx.
         Searches both public and private directories.
-        
+
         Args:
             template_name: Name of the template or genome contig to locate
-            
+
         Returns:
             Tuple containing:
                 - Plate name/barcode (or None if not found)
                 - Well position (or None if not found)
                 Format of well position is standard 96-well notation (e.g., 'A1', 'H12')
-                
+
         Raises:
             FileNotFoundError: If required mapping files aren't found
         """
-        from pathlib import Path
 
         # Construct private template directory path
         private_template_folder = get_templates_path(private=True)
@@ -1390,15 +1389,15 @@ class BatchDesigner:
 
     def generate_machine_assembly_instructions(self, output_prefix: str, machine_type: str, timestamp: str) -> str:
         """Generate machine instructions for combining PCR products into final assemblies.
-        
+
         Args:
             machine_type: Type of liquid handling machine (e.g., 'epmotion')
             output_prefix: Path prefix for output files (same as human instructions)
             timestamp: Timestamp for file naming
-            
+
         Returns:
             str: Path to the generated instructions file
-            
+
         Raises:
             ValueError: If assembly groups haven't been generated
             ValueError: If machine type is not supported
@@ -1492,7 +1491,7 @@ class BatchDesigner:
 
     def save_input_record(self, output_prefix: str) -> None:
         """Save a record of input constructs to file for future reference.
-        
+
         Args:
             output_prefix: Path prefix for output files
         """

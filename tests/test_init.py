@@ -1,14 +1,14 @@
 """Tests for pyeast init command and configuration system."""
 
-import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import pytest
 import yaml
-from pathlib import Path
 from click.testing import CliRunner
-from unittest.mock import patch, MagicMock
 
-from pyeast.cli.main import cli, DATA_REPO_URL, _DATA_REPO_CLONE_DIR
-from pyeast.config import PyeastConfig, get_config, reset_config
+from pyeast.cli.main import DATA_REPO_URL, cli
+from pyeast.config import get_config, reset_config
 
 
 @pytest.fixture
@@ -73,7 +73,7 @@ class TestInitCommand:
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         assert config_file.exists()
 
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             config_data = yaml.safe_load(f)
 
         assert 'data_dir' in config_data
@@ -96,7 +96,7 @@ class TestInitCommand:
         assert "Output directory set to" in result.output
 
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             config_data = yaml.safe_load(f)
 
         assert 'data_dir' in config_data
@@ -160,7 +160,7 @@ class TestInitCommand:
         assert "Configured PYEAST to use data at" in result.output
 
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             config_data = yaml.safe_load(f)
         assert Path(config_data['data_dir']) == new_data_dir.resolve()
 
@@ -184,7 +184,7 @@ class TestInitCommand:
 
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         assert config_file.exists()
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             config_data = yaml.safe_load(f)
         assert Path(config_data['data_dir']) == clone_dir
 
@@ -217,7 +217,7 @@ class TestInitCommand:
         assert "already cloned" in result.output
 
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             config_data = yaml.safe_load(f)
         assert Path(config_data['data_dir']) == clone_dir
 

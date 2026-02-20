@@ -29,7 +29,7 @@ This module provides tools for designing pop-in/pop-out replacements in S. cerev
 
 
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -40,9 +40,9 @@ from prompt_toolkit.completion import WordCompleter
 from rich.console import Console
 from rich.table import Table
 
-from ..utils.primer_utils import design_screening_primers
-from ..utils.sequence_utils import load_sequences
-from ..utils.path_utils import get_templates_path, get_component_libraries_path
+from pyeast.utils.path_utils import get_component_libraries_path, get_templates_path
+from pyeast.utils.primer_utils import design_screening_primers
+from pyeast.utils.sequence_utils import load_sequences
 
 
 class ReplaceDesigner:
@@ -82,13 +82,13 @@ class ReplaceDesigner:
         self.product_sizes = None
         self.marker_position = "upstream"  # Default position
 
-    def find_target_sequence(self, genome_file: Path, target_seq: str) -> Optional[Tuple[str, int, int, str]]:
+    def find_target_sequence(self, genome_file: Path, target_seq: str) -> Optional[tuple[str, int, int, str]]:
         """Locate a target sequence in the genome.
-        
+
         Args:
             genome_file: Path to the genome file
             target_seq: The DNA sequence to find
-            
+
         Returns:
             Tuple containing (chromosome_id, start, end, orientation) or None if not found
         """
@@ -106,7 +106,7 @@ class ReplaceDesigner:
 
         return None
 
-    def print_sequence_grid(self, sequences: Dict[str, SeqRecord], title: str = "Available Sequences"):
+    def print_sequence_grid(self, sequences: dict[str, SeqRecord], title: str = "Available Sequences"):
         """Display available sequences in a formatted table."""
         table = Table(title=title)
         table.add_column("Name", style="cyan")
@@ -124,10 +124,10 @@ class ReplaceDesigner:
 
     def get_replacement_selection(self, components_dir: Path) -> Optional[SeqRecord]:
         """Get user selection for replacement sequence from a library.
-        
+
         Args:
             components_dir: Directory containing sequence libraries
-            
+
         Returns:
             Selected sequence as SeqRecord or None if selection cancelled
         """
@@ -161,15 +161,15 @@ class ReplaceDesigner:
             except KeyboardInterrupt:
                 return None
 
-    def extract_sequences(self, genome_seq: Seq, start: int, end: int, orientation: str) -> Tuple[Seq, Seq, Seq]:
+    def extract_sequences(self, genome_seq: Seq, start: int, end: int, orientation: str) -> tuple[Seq, Seq, Seq]:
         """Extract required sequences based on marker position and orientation.
-        
+
         Args:
             genome_seq: Full genome sequence
             start: Start position of target
             end: End position of target
             orientation: Either "forward" or "reverse"
-            
+
         Returns:
             Tuple of (upstream_homology, downstream_homology, repeat)
         """
@@ -201,7 +201,7 @@ class ReplaceDesigner:
 
     def make_replacement_cassette(self, genome_file: Path, ura3_file: Path) -> SeqRecord:
         """Create the replacement cassette with URA3 marker.
-        
+
         Ensures the replacement sequence is correctly oriented relative to the target
         sequence before assembly.
 
@@ -332,15 +332,15 @@ class ReplaceDesigner:
         self.replacement_cassette = cassette
         return cassette
 
-    def design_screening_strategy(self, genome_file: Path) -> Tuple[str, str, Dict[str, int]]:
+    def design_screening_strategy(self, genome_file: Path) -> tuple[str, str, dict[str, int]]:
         """Design screening primers and calculate expected product sizes.
-        
+
         Args:
             genome_file: Path to the genome file
-            
+
         Returns:
             Tuple containing (forward_primer, reverse_primer, product_sizes)
-            
+
         Raises:
             ValueError: If no target sequence has been found
         """

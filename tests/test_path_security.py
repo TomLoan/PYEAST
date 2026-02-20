@@ -4,14 +4,11 @@ This module tests that path traversal attacks and other security issues
 are properly prevented by the path utility functions.
 """
 
+
 import pytest
-from pathlib import Path
-from pyeast.utils.path_utils import (
-    get_data_path,
-    get_output_path,
-    get_private_equivalent
-)
+
 from pyeast.config import reset_config
+from pyeast.utils.path_utils import get_data_path, get_output_path, get_private_equivalent
 
 
 class TestPathTraversalPrevention:
