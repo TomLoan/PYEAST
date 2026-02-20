@@ -74,9 +74,9 @@ class TestValidPathsStillWork:
 
     def test_get_data_path_normal_subdirectory(self):
         """Test that normal subdirectories work."""
-        path = get_data_path("component libraries")
+        path = get_data_path("component_libraries")
         assert path.exists()
-        assert "component libraries" in str(path)
+        assert "component_libraries" in str(path)
 
     def test_get_data_path_nested_subdirectory(self):
         """Test that nested subdirectories work."""
