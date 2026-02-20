@@ -983,7 +983,7 @@ def _clone_data_repo(subprocess) -> None:
         capture_output=True, text=True
     )
     if result.returncode != 0:
-        console.print(f"[red]✗ Clone failed:[/red]\n{result.stderr}")
+        console.print(f"[red]Clone failed:[/red]\n{result.stderr}")
         raise click.Abort()
 
     _write_config(clone_dir, None)
@@ -1025,7 +1025,7 @@ def init(data_dir, output_dir):
         # User provided an existing data location
         target = Path(data_dir)
         if not target.exists():
-            console.print(f"[red]✗ Directory not found: {target}[/red]")
+            console.print(f"[red]Directory not found: {target}[/red]")
             raise click.Abort()
 
         if output_dir:
@@ -1059,7 +1059,7 @@ def init(data_dir, output_dir):
             new_path = click.prompt("Data directory path", type=click.Path())
             target = Path(new_path)
             if not target.exists():
-                console.print(f"[red]✗ Directory not found: {target}[/red]")
+                console.print(f"[red]Directory not found: {target}[/red]")
                 raise click.Abort()
             _write_config(target.resolve(), None)
             console.print(f"[green]Configured PYEAST to use data at {target}[/green]")
