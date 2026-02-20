@@ -974,7 +974,7 @@ def _clone_data_repo(subprocess) -> None:
         console.print(f"[green]Data repository already cloned at {clone_dir}[/green]")
         console.print(f"[dim]To update: git -C {clone_dir} pull[/dim]")
         _write_config(clone_dir, None)
-        console.print(f"[green]✓ Config updated to use data at {clone_dir}[/green]")
+        console.print(f"[green]Config updated to use data at {clone_dir}[/green]")
         return
 
     console.print(f"Cloning PYEAST data repository from {DATA_REPO_URL} ...")
@@ -987,8 +987,8 @@ def _clone_data_repo(subprocess) -> None:
         raise click.Abort()
 
     _write_config(clone_dir, None)
-    console.print(f"[green]✓ Data repository cloned to {clone_dir}[/green]")
-    console.print(f"[green]✓ Configured PYEAST to use data at {clone_dir}[/green]")
+    console.print(f"[green]Data repository cloned to {clone_dir}[/green]")
+    console.print(f"[green]Configured PYEAST to use data at {clone_dir}[/green]")
     console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
 
 
@@ -1035,9 +1035,9 @@ def init(data_dir, output_dir):
                 console.print("[dim]It will be created when needed.[/dim]")
 
         _write_config(target.resolve(), Path(output_dir).resolve() if output_dir else None)
-        console.print(f"[green]✓ Configured PYEAST to use data at {target}[/green]")
+        console.print(f"[green]Configured PYEAST to use data at {target}[/green]")
         if output_dir:
-            console.print(f"[green]✓ Output directory set to {output_dir}[/green]")
+            console.print(f"[green]Output directory set to {output_dir}[/green]")
         console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
         return
 
@@ -1062,7 +1062,7 @@ def init(data_dir, output_dir):
                 console.print(f"[red]✗ Directory not found: {target}[/red]")
                 raise click.Abort()
             _write_config(target.resolve(), None)
-            console.print(f"[green]✓ Configured PYEAST to use data at {target}[/green]")
+            console.print(f"[green]Configured PYEAST to use data at {target}[/green]")
             return
         # choice == "2" falls through to clone logic below
 
