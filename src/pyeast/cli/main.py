@@ -1018,7 +1018,7 @@ def init(data_dir, output_dir):
 
     Examples:
         pyeast init
-        pyeast init --data-dir /path/to/PYEAST_data/data
+        pyeast init --data-dir /path/to/PYEAST_data
         pyeast init --data-dir /path/to/data --output-dir /path/to/output
     """
     import subprocess

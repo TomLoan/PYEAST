@@ -22,12 +22,18 @@ def test_data_dir():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def mock_data_paths(test_data_dir, monkeypatch):
+def mock_data_paths(request, test_data_dir, monkeypatch):
     """Mock all data path functions to use test fixtures.
 
     This fixture automatically applies to all tests and ensures
     that data paths resolve to the test fixtures directory.
+    Tests marked with @pytest.mark.realdata are exempt and use the
+    real configured data directory instead.
     """
+    if request.node.get_closest_marker('realdata'):
+        yield
+        return
+
     # Mock environment variable
     monkeypatch.setenv('PYEAST_DATA_DIR', str(test_data_dir))
 

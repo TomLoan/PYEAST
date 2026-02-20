@@ -15,6 +15,7 @@ from pyeast.core.deletion import DeletionDesigner
 from pyeast.core.replace import ReplaceDesigner
 from pyeast.core.gg import ggDesigner
 from pyeast.utils.sequence_utils import load_sequences
+from pyeast.utils.path_utils import get_templates_path, get_component_libraries_path
 
 
 #Helper functions to load test data
@@ -433,6 +434,7 @@ def test_instructions_tsv_format():
             f"{test_case}: Part names should not be empty"
 
 
+@pytest.mark.realdata
 def test_deletion_designer_golden_case(mock_console_interaction):
     """Test DeletionDesigner against a known deletion case."""
     test_case_dir = 'golden_delete'
@@ -455,8 +457,8 @@ def test_deletion_designer_golden_case(mock_console_interaction):
     # Set the target sequence
     designer.target_sequence = str(input_seq.seq)
 
-    # Find target in genome (using default genome file in data/templates/)
-    genome_file = Path('data/templates/BY4741_Toronto_2012.fsa')
+    # Find target in genome (using default genome file in templates/)
+    genome_file = get_templates_path() / 'BY4741_Toronto_2012.fsa'
     if not genome_file.exists():
         pytest.skip('Genome file not found - required for deletion tests')
 
@@ -465,7 +467,7 @@ def test_deletion_designer_golden_case(mock_console_interaction):
     designer.genome_location = location
 
     # Create deletion cassette
-    ura3_file = Path('data/component libraries/Saccharomyces cerevisiae/URA3.fasta')
+    ura3_file = get_component_libraries_path() / 'Saccharomyces_cerevisiae' / 'URA3.fasta'
     if not ura3_file.exists():
         pytest.skip('URA3 file not found - required for deletion tests')
 
@@ -506,6 +508,7 @@ def test_deletion_designer_golden_case(mock_console_interaction):
     assert len(reverse_primer) > 0, "Reverse primer should not be empty"
 
 
+@pytest.mark.realdata
 def test_replace_designer_golden_case(mock_console_interaction):
     """Test ReplaceDesigner against a known replacement case."""
     test_case_dir = 'golden_replace'
@@ -535,8 +538,8 @@ def test_replace_designer_golden_case(mock_console_interaction):
     designer.replacement_sequence = replacement_seq
     designer.marker_position = "upstream"  # From README
 
-    # Find target in genome (using default genome file in data/templates/)
-    genome_file = Path('data/templates/BY4741_Toronto_2012.fsa')
+    # Find target in genome (using default genome file in templates/)
+    genome_file = get_templates_path() / 'BY4741_Toronto_2012.fsa'
     if not genome_file.exists():
         pytest.skip('Genome file not found - required for replace tests')
 
@@ -545,7 +548,7 @@ def test_replace_designer_golden_case(mock_console_interaction):
     designer.genome_location = location
 
     # Create replacement cassette
-    ura3_file = Path('data/component libraries/Saccharomyces cerevisiae/URA3.fasta')
+    ura3_file = get_component_libraries_path() / 'Saccharomyces_cerevisiae' / 'URA3.fasta'
     if not ura3_file.exists():
         pytest.skip('URA3 file not found - required for replace tests')
 
@@ -590,6 +593,7 @@ def test_replace_designer_golden_case(mock_console_interaction):
     assert len(reverse_primer) > 0, "Reverse primer should not be empty"
 
 
+@pytest.mark.realdata
 def test_gg_designer_golden_case(mock_console_interaction):
     """Test ggDesigner (Golden Gate) against a known assembly case."""
     test_case_dir = 'golden_gg'
@@ -600,7 +604,7 @@ def test_gg_designer_golden_case(mock_console_interaction):
         pytest.skip('Test data not yet set up')
 
     # Load component sequences from existing MoClo library
-    component_lib = Path('data/component libraries/Yeast Moclo lvl 0')
+    component_lib = get_component_libraries_path() / 'Yeast_Moclo_lvl_0'
     if not component_lib.exists():
         pytest.skip('MoClo component library not found - required for GG tests')
 

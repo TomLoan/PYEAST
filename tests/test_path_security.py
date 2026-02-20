@@ -61,7 +61,7 @@ class TestGetPrivateEquivalent:
     def test_private_equivalent_works_for_valid_paths(self, test_data_dir):
         """Test that valid paths within data dir work correctly."""
         # This should work - path is within data dir
-        public_path = test_data_dir / "component libraries" / "YTK" / "promoter.fasta"
+        public_path = test_data_dir / "component_libraries" / "YTK" / "promoter.fasta"
         private_path = get_private_equivalent(public_path)
 
         # Should be in private/component libraries/YTK/
@@ -80,16 +80,16 @@ class TestValidPathsStillWork:
 
     def test_get_data_path_nested_subdirectory(self):
         """Test that nested subdirectories work."""
-        path = get_data_path("component libraries/YTK")
+        path = get_data_path("component_libraries/YTK")
         # Path may not exist but should be constructed correctly
-        assert "component libraries" in str(path)
+        assert "component_libraries" in str(path)
         assert "YTK" in str(path)
 
-    def test_get_data_path_with_spaces(self):
-        """Test that subdirectories with spaces work."""
-        path = get_data_path("integration sites")
+    def test_get_data_path_with_underscores(self):
+        """Test that subdirectories with underscores work."""
+        path = get_data_path("integration_sites")
         # Should construct path correctly
-        assert "integration sites" in str(path)
+        assert "integration_sites" in str(path)
 
     def test_get_output_path_normal_use(self):
         """Test that normal output path usage works."""
