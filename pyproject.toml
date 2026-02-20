@@ -180,8 +180,3 @@ exclude_dirs = ["tests", ".venv", "scripts"]
 skips = ["B101", "B301", "B403", "B404", "B501"]
 exclude = ["*_test.py", "test_*.py"]
 
-# see https://docs.pytest.org/en/6.2.x/customize.html and https://docs.pytest.org/en/6.2.x/reference.html#ini-options-ref
-[tool.pytest.ini_options]
-filterwarnings = ["ignore::DeprecationWarning"]
-# default pytest args for coverage report to console+html (cov-report), reporting long-running tests (durations-min), native stacktraces (tb=native), and jupyer notebook running (nbmake)
-addopts = '-s --cov-report term-missing --durations=0 --durations-min=5.0 --tb=native --timeout=300 --nbmake --nbmake-timeout=5000 src/'

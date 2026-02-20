@@ -1,13 +1,14 @@
 """Tests for pyeast init command and configuration system."""
 
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import pytest
 import yaml
-from pathlib import Path
 from click.testing import CliRunner
-from unittest.mock import patch
 
-from pyeast.cli.main import cli
-from pyeast.config import PyeastConfig, get_config, reset_config
+from pyeast.cli.main import DATA_REPO_URL, cli
+from pyeast.config import get_config, reset_config
 
 
 @pytest.fixture
@@ -64,18 +65,15 @@ class TestInitCommand:
         """Test init command with --data-dir option."""
         data_dir = isolated_config['data']
 
-        # Run init command
         result = runner.invoke(cli, ['init', '--data-dir', str(data_dir)])
 
         assert result.exit_code == 0
         assert "Configured PYEAST to use data at" in result.output
 
-        # Check config file was created
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         assert config_file.exists()
 
-        # Verify config content
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             config_data = yaml.safe_load(f)
 
         assert 'data_dir' in config_data
@@ -97,9 +95,8 @@ class TestInitCommand:
         assert "Configured PYEAST to use data at" in result.output
         assert "Output directory set to" in result.output
 
-        # Check config file
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             config_data = yaml.safe_load(f)
 
         assert 'data_dir' in config_data
@@ -131,45 +128,121 @@ class TestInitCommand:
         assert "Output directory does not exist" in result.output
         assert "It will be created when needed" in result.output
 
-    def test_init_already_configured(self, runner, isolated_config):
-        """Test init command when already configured."""
+    def test_init_already_configured_no_reconfigure(self, runner, isolated_config):
+        """Test init with no args when already configured — user declines reconfigure."""
         data_dir = isolated_config['data']
 
-        # Run init once
+        # Run init once to configure
         runner.invoke(cli, ['init', '--data-dir', str(data_dir)])
-
-        # Reset config to re-read from file
         reset_config()
 
-        # Run init again without arguments
-        result = runner.invoke(cli, ['init'])
+        # Run init again without args; user answers 'n' to reconfigure prompt
+        result = runner.invoke(cli, ['init'], input='n\n')
 
         assert result.exit_code == 0
-        assert "Data directory already configured" in result.output
+        assert "Data directory:" in result.output
+        assert "Would you like to reconfigure?" in result.output
 
-    def test_init_no_args_shows_help(self, runner, isolated_config):
-        """Test init command without arguments shows helpful message."""
-        result = runner.invoke(cli, ['init'])
+    def test_init_already_configured_reconfigure_manual_path(self, runner, isolated_config):
+        """Test reconfiguring with a new manual path when already configured."""
+        data_dir = isolated_config['data']
+        new_data_dir = isolated_config['tmp'] / "new_data"
+        new_data_dir.mkdir()
 
-        assert result.exit_code == 0
-        assert "PYEAST Data Setup" in result.output
-        assert "Options:" in result.output
-        assert "pyeast init --data-dir" in result.output
-
-    def test_init_in_dev_mode(self, runner, isolated_config, monkeypatch):
-        """Test init command when in dev mode."""
-        # Create ./data/ and .git in the fake cwd
-        dev_cwd = isolated_config['cwd']
-        (dev_cwd / "data").mkdir()
-        (dev_cwd / ".git").mkdir()
-
-        # Reset config so it picks up the new dev mode
+        # Initial configuration
+        runner.invoke(cli, ['init', '--data-dir', str(data_dir)])
         reset_config()
 
-        result = runner.invoke(cli, ['init'])
+        # Reconfigure: choose option 1 (manual path)
+        result = runner.invoke(cli, ['init'], input=f'y\n1\n{new_data_dir}\n')
 
         assert result.exit_code == 0
-        assert "Running in dev mode" in result.output
+        assert "Configured PYEAST to use data at" in result.output
+
+        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        with open(config_file) as f:
+            config_data = yaml.safe_load(f)
+        assert Path(config_data['data_dir']) == new_data_dir.resolve()
+
+    def test_init_no_args_clones_repo(self, runner, isolated_config):
+        """Test init with no args and nothing configured — should clone data repo."""
+        clone_dir = isolated_config['home'] / ".pyeast" / "data-repo"
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch('pyeast.cli.main._DATA_REPO_CLONE_DIR', clone_dir), \
+             patch('subprocess.run', return_value=mock_result) as mock_run:
+            result = runner.invoke(cli, ['init'])
+
+        assert result.exit_code == 0, result.output
+        mock_run.assert_called_once_with(
+            ["git", "clone", DATA_REPO_URL, str(clone_dir)],
+            capture_output=True, text=True
+        )
+        assert "Cloning PYEAST data repository" in result.output
+
+        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        assert config_file.exists()
+        with open(config_file) as f:
+            config_data = yaml.safe_load(f)
+        assert Path(config_data['data_dir']) == clone_dir
+
+    def test_init_no_args_clone_fails(self, runner, isolated_config):
+        """Test init with no args when git clone fails."""
+        clone_dir = isolated_config['home'] / ".pyeast" / "data-repo"
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "fatal: repository not found"
+
+        with patch('pyeast.cli.main._DATA_REPO_CLONE_DIR', clone_dir), \
+             patch('subprocess.run', return_value=mock_result):
+            result = runner.invoke(cli, ['init'])
+
+        assert result.exit_code != 0
+        assert "Clone failed" in result.output
+
+    def test_init_no_args_already_cloned(self, runner, isolated_config):
+        """Test init with no args when clone dir already exists — should not re-clone."""
+        clone_dir = isolated_config['home'] / ".pyeast" / "data-repo"
+        clone_dir.mkdir(parents=True)
+
+        with patch('pyeast.cli.main._DATA_REPO_CLONE_DIR', clone_dir), \
+             patch('subprocess.run') as mock_run:
+            result = runner.invoke(cli, ['init'])
+
+        assert result.exit_code == 0, result.output
+        mock_run.assert_not_called()
+        assert "already cloned" in result.output
+
+        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        with open(config_file) as f:
+            config_data = yaml.safe_load(f)
+        assert Path(config_data['data_dir']) == clone_dir
+
+    def test_init_already_configured_reconfigure_clone(self, runner, isolated_config):
+        """Test reconfiguring via clone when already configured with a different path."""
+        data_dir = isolated_config['data']
+        clone_dir = isolated_config['home'] / ".pyeast" / "data-repo"
+
+        # Initial configuration
+        runner.invoke(cli, ['init', '--data-dir', str(data_dir)])
+        reset_config()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch('pyeast.cli.main._DATA_REPO_CLONE_DIR', clone_dir), \
+             patch('subprocess.run', return_value=mock_result) as mock_run:
+            # Reconfigure: choose option 2 (clone)
+            result = runner.invoke(cli, ['init'], input='y\n2\n')
+
+        assert result.exit_code == 0, result.output
+        mock_run.assert_called_once_with(
+            ["git", "clone", DATA_REPO_URL, str(clone_dir)],
+            capture_output=True, text=True
+        )
 
 
 class TestConfigPriority:
@@ -177,7 +250,6 @@ class TestConfigPriority:
 
     def test_env_var_takes_priority(self, isolated_config, monkeypatch):
         """Test that environment variable has highest priority."""
-        # Set up config file
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -187,24 +259,19 @@ class TestConfigPriority:
         with open(config_file, 'w') as f:
             yaml.dump({'data_dir': str(config_data_dir)}, f)
 
-        # Set environment variable to different path
         env_data_dir = isolated_config['tmp'] / "env_data"
         env_data_dir.mkdir()
         monkeypatch.setenv('PYEAST_DATA_DIR', str(env_data_dir))
 
-        # Reset and get config
         reset_config()
         config = get_config()
 
-        # Environment variable should win
         assert config.data_dir == env_data_dir.resolve()
 
     def test_config_file_used_when_no_env_var(self, isolated_config, monkeypatch):
         """Test that config file is used when no environment variable."""
-        # Ensure no env var
         monkeypatch.delenv('PYEAST_DATA_DIR', raising=False)
 
-        # Create config file
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -214,43 +281,18 @@ class TestConfigPriority:
         with open(config_file, 'w') as f:
             yaml.dump({'data_dir': str(config_data_dir)}, f)
 
-        # Reset and get config
         reset_config()
         config = get_config()
 
-        # Config file should be used
         assert config.data_dir == config_data_dir.resolve()
-
-    @patch('pyeast.config.PyeastConfig._is_dev_mode')
-    def test_dev_mode_used_when_no_config(self, mock_dev_mode, isolated_config, monkeypatch):
-        """Test that dev mode is detected when no other config."""
-        # Ensure no env var or config file
-        monkeypatch.delenv('PYEAST_DATA_DIR', raising=False)
-
-        # Mock dev mode detection
-        mock_dev_mode.return_value = True
-
-        # Reset and get config
-        reset_config()
-        config = get_config()
-
-        # Should use ./data/ from current directory
-        expected = (Path.cwd() / "data").resolve()
-        assert config.data_dir == expected
 
     def test_default_path_when_nothing_configured(self, isolated_config, monkeypatch):
         """Test default path is used when nothing else configured."""
-        # Ensure no env var or config file
         monkeypatch.delenv('PYEAST_DATA_DIR', raising=False)
 
-        # Ensure we're not in dev mode (no ./data/ or .git)
-        # This is implicitly true in tmp_path
-
-        # Reset and get config
         reset_config()
         config = get_config()
 
-        # Should use default: ~/PYEAST/data/
         expected = (isolated_config['home'] / "PYEAST" / "data").resolve()
         assert config.data_dir == expected
 
@@ -274,7 +316,6 @@ class TestConfigOutputDir:
         """Test output_dir from config file."""
         monkeypatch.delenv('PYEAST_OUTPUT_DIR', raising=False)
 
-        # Create config file with output_dir
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -300,60 +341,8 @@ class TestConfigOutputDir:
         reset_config()
         config = get_config()
 
-        # Default should be ~/PYEAST/output/
         expected = (isolated_config['home'] / "PYEAST" / "output").resolve()
         assert config.output_dir == expected
-
-
-class TestDevModeDetection:
-    """Test development mode detection."""
-
-    def test_dev_mode_detected_with_data_and_git(self, monkeypatch):
-        """Test dev mode is detected when ./data/ and .git exist."""
-        # Clear env var set by autouse fixture
-        monkeypatch.delenv('PYEAST_DATA_DIR', raising=False)
-        monkeypatch.delenv('PYEAST_OUTPUT_DIR', raising=False)
-
-        # We're already IN a dev mode directory (PYEAST Local has ./data/ and .git/)
-        # So just test that config detects it correctly
-        reset_config()
-        config = PyeastConfig()
-
-        # The actual PYEAST Local directory has both ./data/ and .git/
-        # so dev mode should be detected
-        assert config.is_dev_mode is True
-
-        # And data_dir should point to ./data/
-        assert config.data_dir.name == "data"
-        assert config.data_dir.exists()
-
-    def test_dev_mode_not_detected_without_git(self, tmp_path, monkeypatch):
-        """Test dev mode is not detected without .git."""
-        # Create only ./data/
-        data_dir = tmp_path / "data"
-        data_dir.mkdir()
-
-        # Mock cwd
-        monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
-
-        reset_config()
-        config = PyeastConfig()
-
-        assert config.is_dev_mode is False
-
-    def test_dev_mode_not_detected_without_data(self, tmp_path, monkeypatch):
-        """Test dev mode is not detected without ./data/."""
-        # Create only .git
-        git_dir = tmp_path / ".git"
-        git_dir.mkdir()
-
-        # Mock cwd
-        monkeypatch.setattr(Path, "cwd", lambda: tmp_path)
-
-        reset_config()
-        config = PyeastConfig()
-
-        assert config.is_dev_mode is False
 
 
 class TestConfigFileHandling:
@@ -364,30 +353,24 @@ class TestConfigFileHandling:
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
-        # Write invalid YAML
         with open(config_file, 'w') as f:
             f.write("this is not: valid: yaml: [[[")
 
-        # Should emit warning about config loading failure
         with pytest.warns(UserWarning, match="Could not load config file"):
             reset_config()
             config = get_config()
 
-        # Should gracefully fall back to default path
         expected = (isolated_config['home'] / "PYEAST" / "data").resolve()
         assert config.data_dir == expected
 
     def test_missing_config_file_ok(self, isolated_config):
-        """Test that missing config file is OK. Generates a warning"""
-        # Ensure config file doesn't exist
+        """Test that missing config file is OK."""
         config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
         assert not config_file.exists()
 
-        # Should not crash
         reset_config()
         config = get_config()
 
-        # Should use default
         expected = (isolated_config['home'] / "PYEAST" / "data").resolve()
         assert config.data_dir == expected
 
@@ -398,16 +381,13 @@ class TestConfigFileHandling:
 
         data_dir = isolated_config['data']
 
-        # Write config with only data_dir
         with open(config_file, 'w') as f:
             yaml.dump({'data_dir': str(data_dir)}, f)
 
         reset_config()
         config = get_config()
 
-        # data_dir should come from config
         assert config.data_dir == data_dir.resolve()
 
-        # output_dir should use default
         expected_output = (isolated_config['home'] / "PYEAST" / "output").resolve()
         assert config.output_dir == expected_output

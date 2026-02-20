@@ -4,14 +4,14 @@ This module handles configuration loading and data path resolution.
 Configuration priority (highest to lowest):
 1. Environment variables (PYEAST_DATA_DIR, PYEAST_OUTPUT_DIR)
 2. Config file (~/.pyeast/config.yaml)
-3. Dev mode detection (./data/ if running from git checkout)
-4. Default locations (~/PYEAST/data/)
+3. Default locations (~/PYEAST/data/)
 """
 
 import os
-import yaml
 from pathlib import Path
 from typing import Optional
+
+import yaml
 
 
 class PyeastConfig:
@@ -28,8 +28,7 @@ class PyeastConfig:
         Priority:
         1. PYEAST_DATA_DIR environment variable
         2. data_dir in config file
-        3. ./data/ if in dev mode (git checkout)
-        4. ~/PYEAST/data/ as default
+        3. ~/PYEAST/data/ as default
         """
         # Priority 1: Environment variable
         env_data_dir = os.getenv('PYEAST_DATA_DIR')
@@ -45,11 +44,7 @@ class PyeastConfig:
             if path.exists():
                 return path.resolve()
 
-        # Priority 3: Dev mode (git checkout with ./data/)
-        if self._is_dev_mode():
-            return (Path.cwd() / "data").resolve()
-
-        # Priority 4: Default user directory
+        # Priority 3: Default user directory
         return (Path.home() / "PYEAST" / "data").resolve()
 
     def _resolve_output_dir(self) -> Path:
@@ -58,8 +53,7 @@ class PyeastConfig:
         Priority:
         1. PYEAST_OUTPUT_DIR environment variable
         2. output_dir in config file
-        3. ./output/ if in dev mode
-        4. ~/PYEAST/output/ as default
+        3. ~/PYEAST/output/ as default
         """
         # Priority 1: Environment variable
         env_output_dir = os.getenv('PYEAST_OUTPUT_DIR')
@@ -71,11 +65,7 @@ class PyeastConfig:
         if config_data and 'output_dir' in config_data:
             return Path(config_data['output_dir']).resolve()
 
-        # Priority 3: Dev mode
-        if self._is_dev_mode():
-            return (Path.cwd() / "output").resolve()
-
-        # Priority 4: Default user directory
+        # Priority 3: Default user directory
         return (Path.home() / "PYEAST" / "output").resolve()
 
     def _load_config_file(self) -> Optional[dict]:
@@ -83,32 +73,14 @@ class PyeastConfig:
         config_file = Path.home() / ".pyeast" / "config.yaml"
         if config_file.exists():
             try:
-                with open(config_file, 'r') as f:
+                with open(config_file) as f:
                     return yaml.safe_load(f)
-            except (yaml.YAMLError, IOError, PermissionError) as e:
+            except (OSError, yaml.YAMLError, PermissionError) as e:
                 # Config file exists but couldn't be loaded - warn user
                 import warnings
                 warnings.warn(f"Could not load config file {config_file}: {e}")
                 pass
         return None
-
-    def _is_dev_mode(self) -> bool:
-        """Check if running from a git checkout (dev mode).
-
-        Returns True if:
-        - Current directory contains ./data/ directory
-        - Current directory contains .git/ directory or file
-        """
-        cwd = Path.cwd()
-        has_data = (cwd / "data").exists()
-        has_git = (cwd / ".git").exists()
-        return has_data and has_git
-
-    @property
-    def is_dev_mode(self) -> bool:
-        """Public property to check if in dev mode."""
-        return self._is_dev_mode()
-
 
 # Singleton instance
 _config: Optional[PyeastConfig] = None

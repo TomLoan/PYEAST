@@ -45,9 +45,9 @@ Don't worry too much about perfect style – things can be tidied up during revi
 
 One of the easiest ways to contribute is adding new components to the default libraries:
 
-- **Promoters, terminators, genes**: Add `.fasta` files to `data/component libraries/Saccharomyces cerevisiae/` or create a new folder in `/data/component libraries/` and populate it with .fasta files.
-- **Integration sites**: Add upstream/downstream flanking sequences in a single `.fasta` file. 
-- **Templates**: Add `.gb` or `.fasta` files to `data/templates/`
+- **Promoters, terminators, genes**: Add `.fasta` files to `component_libraries/Saccharomyces_cerevisiae/` in the [PYEAST_data](https://github.com/TomLoan/PYEAST_data) repository, or create a new folder in `component_libraries/` and populate it with `.fasta` files.
+- **Integration sites**: Add upstream/downstream flanking sequences in a single `.fasta` file to `integration_sites/`.
+- **Templates**: Add `.gb` or `.fasta` files to `templates/`.
 
 If you have a collection that would be useful to others, consider submitting a PR!
 

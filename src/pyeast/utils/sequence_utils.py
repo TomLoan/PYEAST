@@ -18,7 +18,7 @@
 
 # src/pyeast/utils/sequence_utils.py
 """
-Sequence utilities for PYEAST. 
+Sequence utilities for PYEAST.
 """
 
 # ===========================================================================
@@ -29,7 +29,7 @@ from collections import Counter
 from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 from Bio import Align, SeqIO
 from Bio.Seq import Seq
@@ -39,7 +39,7 @@ from Bio.SeqRecord import SeqRecord
 from .path_utils import get_private_equivalent
 
 
-def load_sequences(directory: str) -> Dict[str, SeqRecord]:
+def load_sequences(directory: str) -> dict[str, SeqRecord]:
     """
     Load all sequences from FASTA files in both public and private directories.
     Private sequences override public ones if they have the same name.
@@ -107,7 +107,7 @@ def load_sequences(directory: str) -> Dict[str, SeqRecord]:
 
     return sequences
 
-def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]]:
+def get_templates(parts: list[SeqRecord], directory: str) -> dict[str, list[str]]:
     """
     Find template matches for given parts in both public and private directories.
     Can handle directories that exist only in public, only in private, or both.
@@ -157,10 +157,10 @@ def get_templates(parts: List[SeqRecord], directory: str) -> Dict[str, List[str]
 
         if not templates_used[part.name]:
             templates_used[part.name] = ["Not found"]
-    
+
     return templates_used
 
-def rationalize_templates(template_dict: Dict[str, List[str]]) -> Dict[str, str]:
+def rationalize_templates(template_dict: dict[str, list[str]]) -> dict[str, str]:
     """
     Rationalize template selection to minimize the number of unique templates.
 
@@ -179,7 +179,7 @@ def rationalize_templates(template_dict: Dict[str, List[str]]) -> Dict[str, str]
     preferred_templates = ['pUC19', 'pYES2', 'pESC-TRP', ]  # Add more as needed
 
     # Count the global frequency of each template
-    
+
     all_templates = [template for templates in template_dict.values() for template in templates if template != "Not found"]
     template_frequency = Counter(all_templates)
     # print(all_templates)
@@ -204,7 +204,7 @@ def rationalize_templates(template_dict: Dict[str, List[str]]) -> Dict[str, str]
 
     return rationalized_templates
 
-def parse_gb_file(file_path: str) -> Tuple[SeqRecord, List[SeqRecord]]:
+def parse_gb_file(file_path: str) -> tuple[SeqRecord, list[SeqRecord]]:
     """
     Parse a GenBank file and extract the full plasmid sequence and its parts.
 
@@ -223,10 +223,10 @@ def parse_gb_file(file_path: str) -> Tuple[SeqRecord, List[SeqRecord]]:
             parts.append(SeqRecord(part_seq, id=part_name, name=part_name, description=""))
     return plasmid, parts
 
-def write_circular_instructions(rationalized_primers: Dict[str, Dict],
-                              rationalized_templates: Dict[str, str],
-                              assembly_sequences: List[SeqRecord],
-                              homology_length: int) -> List[List[str]]:
+def write_circular_instructions(rationalized_primers: dict[str, dict],
+                              rationalized_templates: dict[str, str],
+                              assembly_sequences: list[SeqRecord],
+                              homology_length: int) -> list[list[str]]:
     """Generate assembly instructions based on rationalized primers and templates.
 
     Args:
@@ -269,12 +269,12 @@ def write_circular_instructions(rationalized_primers: Dict[str, Dict],
 
     return instructions
 
-def write_linear_instructions(rationalized_primers: Dict[str, Dict],
-                            rationalized_templates: Dict[str, str],
+def write_linear_instructions(rationalized_primers: dict[str, dict],
+                            rationalized_templates: dict[str, str],
                             int_site_up: SeqRecord,
-                            middle_sequences: List[SeqRecord],
+                            middle_sequences: list[SeqRecord],
                             int_site_down: SeqRecord,
-                            homology_length: int) -> List[List[str]]:
+                            homology_length: int) -> list[list[str]]:
     """Generate assembly instructions for linear integration assembly.
 
     Args:
@@ -330,7 +330,7 @@ def write_linear_instructions(rationalized_primers: Dict[str, Dict],
 
     return instructions
 
-def find_matching_primer(primers: Dict[str, Dict], part_seq: Seq, is_forward: bool, homology_length: int) -> Optional[Dict]:
+def find_matching_primer(primers: dict[str, dict], part_seq: Seq, is_forward: bool, homology_length: int) -> Optional[dict]:
     """
     Find a matching primer for a given part sequence.
 
@@ -363,7 +363,7 @@ def find_matching_primer(primers: Dict[str, Dict], part_seq: Seq, is_forward: bo
 
     return None
 
-def assemble_parts_circular(parts: List[SeqRecord], primers: Dict[str, Seq], homology_length: int) -> SeqRecord:
+def assemble_parts_circular(parts: list[SeqRecord], primers: dict[str, Seq], homology_length: int) -> SeqRecord:
     """
     Assemble DNA parts using TAR cloning simulation, preserving part information and correctly positioning primers.
 
@@ -515,13 +515,13 @@ def find_all_occurrences(sequence: str, substring: str) -> Generator[int, None, 
         start += 1  # Move to next possible position
 
 
-def assemble_parts_linear(parts: List[SeqRecord], primers: Dict[str, Seq]) -> SeqRecord:
+def assemble_parts_linear(parts: list[SeqRecord], primers: dict[str, Seq]) -> SeqRecord:
     """Assemble parts for integration, add features for components and primers.
-    
+
     Args:
         parts: List of all parts in assembly order (including integration sites)
         primers: Dictionary of primer names and sequences
-    
+
     Returns:
         SeqRecord: Assembled sequence with features and primer annotations
     """

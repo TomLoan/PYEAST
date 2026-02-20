@@ -18,7 +18,7 @@
 
 # src/pyeast/cli/main.py
 """"
-CLI program for PYEAST program. 
+CLI program for PYEAST program.
 """
 
 # ===========================================================================
@@ -37,43 +37,40 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 from tabulate import tabulate
 
-from ..core.batch import BatchDesigner
-from ..core.deletion import DeletionDesigner
-from ..core.gg import ggDesigner
-from ..core.integration import IntegrationDesigner
-from ..core.replace import ReplaceDesigner
-from ..core.tar import TARDesigner
-from ..utils.visualisation import save_figure, visualise_genbank
-from ..utils.path_utils import (
-    get_output_path,
-    get_component_libraries_path,
-    get_primers_path,
-    get_templates_path,
-    ensure_output_dir_exists
-)
+from pyeast.core.batch import BatchDesigner
+from pyeast.core.deletion import DeletionDesigner
+from pyeast.core.gg import ggDesigner
+from pyeast.core.integration import IntegrationDesigner
+from pyeast.core.replace import ReplaceDesigner
+from pyeast.core.tar import TARDesigner
+from pyeast.utils.path_utils import ensure_output_dir_exists, get_component_libraries_path, get_primers_path, get_templates_path
+from pyeast.utils.visualisation import save_figure, visualise_genbank
 
 console = Console()
+
+DATA_REPO_URL = "https://github.com/TomLoan/PYEAST_data.git"
+_DATA_REPO_CLONE_DIR = Path.home() / ".pyeast" / "data-repo"
 
 
 def get_output_prefix() -> Path:
     """Get output prefix from user - creates a subfolder and returns path to files within it.
-    
+
     This function:
     1. Asks user for a name
     2. Checks if a subfolder already exists with that name
     3. If it exists, warns user and asks for confirmation to overwrite
     4. Creates a subfolder in output/ with that name
     5. Returns a Path object: output/name/name
-    
+
     Example:
         If user inputs "my_construct", this returns:
         Path("output/my_construct/my_construct")
-        
+
         Then files are saved as:
         - output/my_construct/my_construct.gb
         - output/my_construct/my_construct_primers.tsv
         etc.
-    
+
     Returns:
         Path object pointing to files within the created subfolder.
         Use .name property to get just the filename without path.
@@ -144,7 +141,7 @@ def get_output_prefix() -> Path:
 
 def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> None:
     """Ask user if they want to generate machine instructions and handle the response.
-    
+
     Args:
         designer: BatchDesigner instance with completed assembly instructions
         output_prefix: Path prefix for output files (same as human instructions)
@@ -910,7 +907,7 @@ def run_gg_interactive_mode(designer: ggDesigner):
                 # Convert to SeqRecord objects and map to plasmids
                 with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
                     task_id = progress.add_task("Assembling selected sequences...", total = None)
-                    plasmids_required = designer.get_plasmid_names()
+                    designer.get_plasmid_names()
                     assembly_sim = designer.gg_assembly(prefix)
                     progress.update(task_id, completed = True)
                 if assembly_sim.errors:
@@ -957,6 +954,44 @@ def run_gg_interactive_mode(designer: ggDesigner):
     except click.Abort:
         console.print("\n[yellow]Operation cancelled[/yellow]")
 
+def _write_config(data_dir: Path, output_dir) -> None:
+    """Write ~/.pyeast/config.yaml with the given data and optional output paths."""
+    import yaml
+    config_file = Path.home() / ".pyeast" / "config.yaml"
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+    config_data = {'data_dir': str(data_dir)}
+    if output_dir:
+        config_data['output_dir'] = str(output_dir)
+    with open(config_file, 'w') as f:
+        yaml.dump(config_data, f)
+
+
+def _clone_data_repo(subprocess) -> None:
+    """Clone the PYEAST data repository to ~/.pyeast/data-repo/ and write config."""
+    clone_dir = _DATA_REPO_CLONE_DIR
+
+    if clone_dir.exists():
+        console.print(f"[green]Data repository already cloned at {clone_dir}[/green]")
+        console.print(f"[dim]To update: git -C {clone_dir} pull[/dim]")
+        _write_config(clone_dir, None)
+        console.print(f"[green]Config updated to use data at {clone_dir}[/green]")
+        return
+
+    console.print(f"Cloning PYEAST data repository from {DATA_REPO_URL} ...")
+    result = subprocess.run(
+        ["git", "clone", DATA_REPO_URL, str(clone_dir)],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        console.print(f"[red]✗ Clone failed:[/red]\n{result.stderr}")
+        raise click.Abort()
+
+    _write_config(clone_dir, None)
+    console.print(f"[green]Data repository cloned to {clone_dir}[/green]")
+    console.print(f"[green]Configured PYEAST to use data at {clone_dir}[/green]")
+    console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
+
+
 @click.group()
 def cli():
     """PYeast: Python tools for yeast genetic engineering
@@ -970,79 +1005,69 @@ def cli():
 def init(data_dir, output_dir):
     """Initialize PYEAST data directory configuration.
 
-    This command helps set up PYEAST after installation to point to your data files.
-    If you're running from a git checkout, this is usually not needed.
+    Without --data-dir: clones the PYEAST data repository to ~/.pyeast/data-repo/
+    automatically, or shows current configuration if already set up.
+
+    With --data-dir: registers an existing data directory.
 
     Examples:
-        pyeast init --data-dir /path/to/PYEAST/data
+        pyeast init
+        pyeast init --data-dir /path/to/PYEAST_data
         pyeast init --data-dir /path/to/data --output-dir /path/to/output
-        pyeast init  # Interactive setup
     """
+    import subprocess
+
     from pyeast.config import get_config
-    from pyeast.utils.path_utils import is_dev_mode
 
     config = get_config()
 
-    # Check if already set up
-    if config.data_dir.exists() and is_dev_mode():
-        console.print(f"[green]Running in dev mode, using {config.data_dir}[/green]")
-        console.print("[dim]Data directory detected in current git checkout.[/dim]")
-        return
-
-    if config.data_dir.exists() and not data_dir:
-        console.print(f"[green]Data directory already configured at {config.data_dir}[/green]")
-        console.print(f"[dim]Output directory: {config.output_dir}[/dim]")
-        console.print("\n[dim]To reconfigure, use one of these methods:[/dim]")
-        console.print("[dim]  1. Set PYEAST_DATA_DIR or PYEAST_OUTPUT_DIR environment variables[/dim]")
-        console.print("[dim]  2. Edit ~/.pyeast/config.yaml[/dim]")
-        console.print("[dim]  3. Run: pyeast init --data-dir /new/path[/dim]")
-        return
-
-    # Interactive setup
     if data_dir:
-        # User provided existing data location
+        # User provided an existing data location
         target = Path(data_dir)
         if not target.exists():
             console.print(f"[red]✗ Directory not found: {target}[/red]")
             raise click.Abort()
 
-        # Validate output_dir if provided
         if output_dir:
             output_target = Path(output_dir)
             if not output_target.exists():
                 console.print(f"[yellow]Output directory does not exist: {output_target}[/yellow]")
                 console.print("[dim]It will be created when needed.[/dim]")
 
-        # Create config file pointing to this location
-        config_file = Path.home() / ".pyeast" / "config.yaml"
-        config_file.parent.mkdir(parents=True, exist_ok=True)
-
-        import yaml
-        config_data = {'data_dir': str(target.resolve())}
-        if output_dir:
-            config_data['output_dir'] = str(Path(output_dir).resolve())
-
-        with open(config_file, 'w') as f:
-            yaml.dump(config_data, f)
-
+        _write_config(target.resolve(), Path(output_dir).resolve() if output_dir else None)
         console.print(f"[green]Configured PYEAST to use data at {target}[/green]")
         if output_dir:
             console.print(f"[green]Output directory set to {output_dir}[/green]")
-        console.print(f"[dim]Config saved to: {config_file}[/dim]")
-        console.print(f"[dim]Advanced users can edit this file directly to add additional options.[/dim]")
+        console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
+        return
 
-    else:
-        # New installation - need to get data
-        console.print("\n[bold]PYEAST Data Setup[/bold]")
-        console.print("\nPYEAST requires data files (component libraries, templates, etc.)")
-        console.print("\n[cyan]Options:[/cyan]")
-        console.print("  1. Clone the git repository and point to its data/")
-        console.print("  2. Specify an existing data directory with --data-dir")
-        console.print("\n[yellow]Example:[/yellow]")
-        console.print("  git clone https://github.com/TomLoan/PYEAST.git ~/PYEAST-data")
-        console.print("  pyeast init --data-dir ~/PYEAST-data/data")
-        console.print("  pyeast init --data-dir ~/PYEAST-data/data --output-dir ~/my-results")
-        console.print("\n[dim]Run 'pyeast init --help' for more information[/dim]")
+    # No --data-dir provided
+    if config.data_dir.exists():
+        # Already configured — show current state and offer to reconfigure
+        console.print(f"[green]Data directory:[/green] {config.data_dir}")
+        console.print(f"[dim]Output directory: {config.output_dir}[/dim]")
+
+        if not click.confirm("\nWould you like to reconfigure?", default=False):
+            return
+
+        console.print("\n[cyan]How would you like to configure the data directory?[/cyan]")
+        console.print("  1. Enter a path to an existing data directory")
+        console.print("  2. Clone the public PYEAST data repository to ~/.pyeast/data-repo/")
+        choice = click.prompt("Choice", type=click.Choice(["1", "2"]))
+
+        if choice == "1":
+            new_path = click.prompt("Data directory path", type=click.Path())
+            target = Path(new_path)
+            if not target.exists():
+                console.print(f"[red]✗ Directory not found: {target}[/red]")
+                raise click.Abort()
+            _write_config(target.resolve(), None)
+            console.print(f"[green]Configured PYEAST to use data at {target}[/green]")
+            return
+        # choice == "2" falls through to clone logic below
+
+    # Clone the public data repo
+    _clone_data_repo(subprocess)
 
 @cli.command()
 @click.option('--homology_length',
@@ -1087,7 +1112,7 @@ def integrate(homology_length):
 		||
 	**transformation**
 		\\/
-    upstream+component1==component1==...==downstream_seq                gDNA    
+    upstream+component1==component1==...==downstream_seq                gDNA
     """
 
     try:
@@ -1119,9 +1144,9 @@ def integrate(homology_length):
 @click.option('--ura3_file',
               type=click.Path(exists=True, path_type=Path),
               default=None,
-              help='Path to URA3 marker file (default: URA3.fasta from data/component libraries/Saccharomyces cerevisiae/)')
+              help='Path to URA3 marker file (default: URA3.fasta from data/component_libraries/Saccharomyces_cerevisiae/)')
 def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome_file, ura3_file):
-    """Design scarless deletions in Saccharomyces cerevisiae.  
+    """Design scarless deletions in Saccharomyces cerevisiae.
     \b\n
     Mechanism:\n
     \b
@@ -1149,7 +1174,7 @@ def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome
                 raise click.Abort()
             genome_file = default_genome
         if ura3_file is None:
-            default_ura3 = get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
+            default_ura3 = get_component_libraries_path() / "Saccharomyces_cerevisiae" / "URA3.fasta"
             if not default_ura3.exists():
                 console.print(f"[red]Default URA3 file not found: {default_ura3}[/red]")
                 console.print("[yellow]Hint: Run 'pyeast init' to configure data directory[/yellow]")
@@ -1190,14 +1215,14 @@ def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome
 @click.option('--ura3_file',
               type=click.Path(exists=True, path_type=Path),
               default=None,
-              help='Path to URA3 marker file (default: URA3.fasta from data/component libraries/Saccharomyces cerevisiae/)')
+              help='Path to URA3 marker file (default: URA3.fasta from data/component_libraries/Saccharomyces_cerevisiae/)')
 def replace(upstream_homology_len, downstream_homology_len, repeat_length, genome_file, ura3_file):
     """Design pop-in/pop-out replacements in Saccharomyces cerevisiae
     \b\n
     Note URA can be positions up or downstream of ura3
     Target must be longer than both homology arms
     Mechanism:
-    
+
     \b
     5'====up==[target=====================down]==repeat==3'     gDNA
           X                                 X
@@ -1206,7 +1231,7 @@ def replace(upstream_homology_len, downstream_homology_len, repeat_length, genom
                  **transformation**
                       \\/
     5'===up==replacement==repeat==ura3==||
-                            X           ||                      gDNA              
+                            X           ||                      gDNA
                       3'==repeat==down==||
                       ||
                 **FOA counter selection**
@@ -1223,7 +1248,7 @@ def replace(upstream_homology_len, downstream_homology_len, repeat_length, genom
                 raise click.Abort()
             genome_file = default_genome
         if ura3_file is None:
-            default_ura3 = get_component_libraries_path() / "Saccharomyces cerevisiae" / "URA3.fasta"
+            default_ura3 = get_component_libraries_path() / "Saccharomyces_cerevisiae" / "URA3.fasta"
             if not default_ura3.exists():
                 console.print(f"[red]Default URA3 file not found: {default_ura3}[/red]")
                 console.print("[yellow]Hint: Run 'pyeast init' to configure data directory[/yellow]")
@@ -1253,18 +1278,18 @@ def batch(reuse_limit):
     """Design batched assemblies for Saccharomyces cerevisiae transformations
     \b\n
     This command helps organize multiple DNA assemblies into efficient batches
-    for parallel processing. 
+    for parallel processing.
     \b\n
     It generates:\b\n
     - Rationalized PCR instructions minimizing redundant reactions\b\n
     - Organized batches keeping construct PCRs together\b\n
     - Machine-readable instructions for liquid handling robots\b\n
-    
+
     The input constructs must already exist as GenBank files in the output directory
-    from previous tar/integrate/replace operations. For liquid handling instructions 
-    templates should be aliquoted into the TemPlate plate, and the name added to the 
-    coresponding well in data/templates/TemPlates.xlsx 
-    
+    from previous tar/integrate/replace operations. For liquid handling instructions
+    templates should be aliquoted into the TemPlate plate, and the name added to the
+    coresponding well in data/templates/TemPlates.xlsx
+
     The GenBank files must contain:
     - misc_feature annotations for components
     - primer_bind annotations for assembly primers
@@ -1289,8 +1314,8 @@ def gg(library):
     \b\n
     Still being developed, use with caution. supports multiplex and library type assemblies
     Use / to separate component names you want to multiplex , or input /allX to select all components of type X
-    The designer can handle parts input out of order, although this can make it hard to see what you're doing, and will 
-    idenify the correct enzyme for the parts you've selected automatically. 
+    The designer can handle parts input out of order, although this can make it hard to see what you're doing, and will
+    idenify the correct enzyme for the parts you've selected automatically.
     """
     try:
         designer = ggDesigner(is_library = library)

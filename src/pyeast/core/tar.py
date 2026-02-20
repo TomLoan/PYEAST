@@ -26,7 +26,6 @@ Transformation Assisted Recombinaiton (TAR) toolkit for plasmid assembly in S. c
 
 
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import click
 from Bio.Seq import Seq
@@ -37,27 +36,23 @@ from prompt_toolkit.shortcuts import confirm
 from rich.console import Console
 from rich.table import Table
 
-from ..utils.primer_utils import (
-    design_circular_primers,
-    get_primer_locations,
-    rationalize_primers,
-)
-from ..utils.sequence_utils import assemble_parts_circular, get_templates, load_sequences, rationalize_templates, write_circular_instructions
+from pyeast.utils.primer_utils import design_circular_primers, get_primer_locations, rationalize_primers
+from pyeast.utils.sequence_utils import assemble_parts_circular, get_templates, load_sequences, rationalize_templates, write_circular_instructions
 
 
 class TARDesigner:
-    """A class for designing TAR experiments . 
-    
-    This class handles the design of primers and assembly 
+    """A class for designing TAR experiments .
+
+    This class handles the design of primers and assembly
     strategies for Transformation Assisted Recombinaiton (TAR)
-    in Sacharomyces cerevisiae. 
+    in Sacharomyces cerevisiae.
     """
 
     def __init__(self, homology_length: int = 25, annealing_temp: float = 50):
-        """Inintialise a new TARDesigner. 
-        
+        """Inintialise a new TARDesigner.
+
         Args:
-            homology_length: Length of homology regions to be added to primers (default: 25) 
+            homology_length: Length of homology regions to be added to primers (default: 25)
             annealing_temp: Target annealing temperature for primer design (default: 50)
             """
 
@@ -78,16 +73,16 @@ class TARDesigner:
 
 
     def load_and_get_sequences(self, directory: Path) -> None:
-        """"Loads seqeunces from a directory and store them for assembly. 
-        
-        Args: 
-            directory: Path to a directory containing fasta files containing DNA components 
+        """"Loads seqeunces from a directory and store them for assembly.
+
+        Args:
+            directory: Path to a directory containing fasta files containing DNA components
             as fasta files
             """
         self.available_sequences = load_sequences(directory)
         return self.available_sequences
 
-    def get_assembly_order(self, sequences: Dict[str, SeqRecord]) -> List[str]:
+    def get_assembly_order(self, sequences: dict[str, SeqRecord]) -> list[str]:
         """Get assembly order from user with autocomplete"""
         sequence_completer = WordCompleter(sequences.keys(), ignore_case=True)
 
@@ -125,7 +120,7 @@ class TARDesigner:
                     return None
                 continue
 
-    def display_instructions(self, instructions: List[List[str]]):
+    def display_instructions(self, instructions: list[list[str]]):
         """Display assembly instructions in a formatted table"""
         table = Table(title="Assembly Instructions")
         table.add_column("Part Name", style="bold cyan")
@@ -169,24 +164,24 @@ class TARDesigner:
 
         self.console.print(table)
 
-    def set_assembly_order(self, selected_names: List[str])-> None:
+    def set_assembly_order(self, selected_names: list[str])-> None:
         """Set the assmebly order from user selected seqeunce names"""
 
         self.assembly_sequences = [
             self.available_sequences[name] for name in selected_names
         ]
 
-    def design_tar_primers(self) -> Dict[str, Seq]:
+    def design_tar_primers(self) -> dict[str, Seq]:
         """Design TAR primers with the necesary overhangs
-        
-        uses the design_circular_primers function from primer_utils to design primers 
-        for the selected assembly sequences. 
-        
-        Returns: 
+
+        uses the design_circular_primers function from primer_utils to design primers
+        for the selected assembly sequences.
+
+        Returns:
             Dictionary mapping primer names to their sequence
-            
-        Raises: 
-            ValueError: If no sequences have been selected for assembly. 
+
+        Raises:
+            ValueError: If no sequences have been selected for assembly.
         """
 
         if not self.assembly_sequences:
@@ -202,14 +197,14 @@ class TARDesigner:
 
     def check_primer_locations(self, primer_folder: Path) -> None:
         """Check for exisiting primers stored in plates
-        
-        Uses primer locations functions from primer_utils to find exisiting primers in 
-        IDT plate maps  and identify which primers need to be ordered. 
-        
-        Args: 
+
+        Uses primer locations functions from primer_utils to find exisiting primers in
+        IDT plate maps  and identify which primers need to be ordered.
+
+        Args:
             primer_folder: Path to folder containing primer Excel files
 
-        Raises: 
+        Raises:
             ValueError: if primers haven't been desinged yet
         """
         if not self.primers:
@@ -223,13 +218,13 @@ class TARDesigner:
 
     def find_templates(self, template_folder: Path) -> None:
         """Find template matches for each assembly component.
-        
+
         Uses template functions from sequence_utils to identify potential
         templates for each sequence and rationalize the selections.
-        
+
         Args:
             template_folder: Path to folder containing template files
-            
+
         Raises:
             ValueError: If no sequences have been selected for assembly
         """
@@ -239,17 +234,17 @@ class TARDesigner:
         self.template_dict = get_templates(self.assembly_sequences, str(template_folder))
 
 
-    def rationalize_selections(self) -> Tuple[Dict[str, Dict], Dict[str, str]]:
+    def rationalize_selections(self) -> tuple[dict[str, dict], dict[str, str]]:
         """Rationalize primer and template selections to minimize plate usage.
-        
+
         Uses rationalization functions from primer_utils to optimize primer plate
         usage and template selections.
-        
+
         Returns:
             Tuple containing:
                 - Dictionary of rationalized primer selections
                 - Dictionary of rationalized template selections
-                
+
         Raises:
             ValueError: If primer locations or templates haven't been checked
         """
@@ -268,12 +263,12 @@ class TARDesigner:
 
         return self.rationalized_primers, self.rationalized_templates
 
-    def write_instructions(self) -> List[List[str]]:
+    def write_instructions(self) -> list[list[str]]:
         """Generate assembly instructions for the TAR cloning experiment.
-        
+
         Returns:
             List of instruction rows containing primer and template details
-            
+
         Raises:
             ValueError: If primers and templates haven't been rationalized
         """
@@ -292,10 +287,10 @@ class TARDesigner:
 
     def create_assembly(self) -> SeqRecord:
         """Create the assembled sequence with all parts and primers.
-        
+
         Returns:
             SeqRecord object representing the assembled construct with features
-            
+
         Raises:
             ValueError: If no primers have been designed
         """

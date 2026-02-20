@@ -30,7 +30,7 @@ Level 1 golden gate assemblies using the yeast Moclo standard from Lee et al 201
 
 import csv
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 import click
 import dnacauldron as dc
@@ -44,22 +44,19 @@ from prompt_toolkit.shortcuts import confirm
 from rich.console import Console
 from rich.table import Table
 
-from ..utils.sequence_utils import (
-    get_templates,
-    load_sequences,
-)
-from ..utils.path_utils import get_templates_path, get_private_equivalent
+from pyeast.utils.path_utils import get_private_equivalent, get_templates_path
+from pyeast.utils.sequence_utils import get_templates, load_sequences
 
 
 class ggDesigner:
-    """A class for designing golden gate assemblies. 
-    
+    """A class for designing golden gate assemblies.
+
     This class handles the design assemblies. Uses the DNAcauldron package from the Edinborough bifoundry.
     """
 
     def __init__(self,
                  template_folder: Optional[Path] = None,
-                 instruments: List = ['Janus', 'epMotion', 'Hamilton', 'Human'],
+                 instruments: list = ['Janus', 'epMotion', 'Hamilton', 'Human'],
                  is_library: bool = False
                  ):
         """Inintialise a new gg_lvl1 designer.
@@ -97,10 +94,10 @@ class ggDesigner:
 
 
     def load_and_get_sequences(self, directory: Path) -> None:
-        """"Loads seqeunces from a directory and store them for assembly. 
-        
-        Args: 
-            directory: Path to a directory containing fasta files containing DNA components 
+        """"Loads seqeunces from a directory and store them for assembly.
+
+        Args:
+            directory: Path to a directory containing fasta files containing DNA components
             as fasta files
             """
         self.available_sequences = load_sequences(directory)
@@ -123,27 +120,27 @@ class ggDesigner:
 
         self.console.print(table)
 
-    def get_assembly_order(self, sequences: Dict[str, SeqRecord]) -> List[list[str]]:
-        """Get assembly order from user with autocomplete and mutliplex support 
+    def get_assembly_order(self, sequences: dict[str, SeqRecord]) -> list[list[str]]:
+        """Get assembly order from user with autocomplete and mutliplex support
 
-        prompts the user to enter sequences for assembly with autocomplete. 
-        Supports multiplex assemblies using '/' syntax to select multiple components 
-        in a given position, or /allx to select all parts of a give type x. 
-        
-        Args: 
-            sequences: Dictionary mapping sequence names to SeqRecord objects 
+        prompts the user to enter sequences for assembly with autocomplete.
+        Supports multiplex assemblies using '/' syntax to select multiple components
+        in a given position, or /allx to select all parts of a give type x.
 
-        Returns: 
+        Args:
+            sequences: Dictionary mapping sequence names to SeqRecord objects
+
+        Returns:
             List[list[str]]: list of assemblies where each assembly is a list of sequence
                             names. For single assemblies returns [[seq1,seq2 ...]]
                             For multiplex assemblies returns [[seq1, seq2a,..], [seq1, seq2b...]]
-        Raises: 
+        Raises:
             click.Abort: if user cancels the operation
             ValueError If no valid sequences are available
 
         Examples:
         Single assembly: "promoter_1 gene_1 terminator_1" -> [["promoter_1", "gene_1", "terminator_1"]]
-        Multiplex: "promoter_1 gene_1/gene_2 terminator_1" -> [["promoter_1", "gene_1", "terminator_1"], 
+        Multiplex: "promoter_1 gene_1/gene_2 terminator_1" -> [["promoter_1", "gene_1", "terminator_1"],
                                                                ["promoter_1", "gene_2", "terminator_1"]]
         All parts: "promoter_1 /all3 terminator_1" -> Multiple assemblies with type 3 parts
         """
@@ -261,15 +258,15 @@ class ggDesigner:
                 continue
 
 
-    def get_plasmid_names(self) -> List[str]:
+    def get_plasmid_names(self) -> list[str]:
         """Map sequences to plasmids containing those sequences.
-        
+
         Searches for plasmids in both public and private plasmid directories.
         Sets self.plasmid_names for dnacauldron assembly.
-        
-        Returns: 
-            List[str] of plasmid filenames (not paths) for dnacauldron assembly 
-        Raises: 
+
+        Returns:
+            List[str] of plasmid filenames (not paths) for dnacauldron assembly
+        Raises:
             ValueError: If no assemblies have been selected
             FileNotFoundError: If no plasmid folder exists
             RuntimeError: If parts cannot be mapped to plasmids
@@ -281,7 +278,6 @@ class ggDesigner:
             raise ValueError("No assembly sequence available. Please run get_seq_records first.")
 
         # Check both public and private plasmid directories
-        from pathlib import Path
         public_plasmids = self.gg_plasmids
 
         # Construct private plasmids path (if path is within data directory)
@@ -378,16 +374,16 @@ class ggDesigner:
 
     def gg_assembly(self, assembly_name: str) -> dc.Type2sRestrictionAssembly:
         """Pass plasmids to dnacauldron for Golden Gate assembly simulation.
-        
+
         Loads plasmids from both public and private directories to create the repository.
         Sets self.assembly_sim = AssemblySimulation object.
-        
-        Args: 
+
+        Args:
             assembly_name: name for plasmids in output
 
-        Raises: 
-            ValueError: If no plasmids have been set 
-            ValueError: If no assemblies have been selected 
+        Raises:
+            ValueError: If no plasmids have been set
+            ValueError: If no assemblies have been selected
             RuntimeError: If assembly simulation fails or produces unexpected results
         """
         from pathlib import Path
@@ -469,13 +465,13 @@ class ggDesigner:
 
     def gg_save_output(self, output_path: str) -> None:
         """Saves the output of the assembly function, creating a new plasmid output file
-        single assemblies, or a folder full of .gb files (no images) for multiplex assemblies. 
-        Takes output from simulation object to write a full report. also uses the user input 
-        from output_prefix to overwirte assembly names with input1, input2 etc. 
-        Outputs a graphical representations of multiplex assemblies. 
+        single assemblies, or a folder full of .gb files (no images) for multiplex assemblies.
+        Takes output from simulation object to write a full report. also uses the user input
+        from output_prefix to overwirte assembly names with input1, input2 etc.
+        Outputs a graphical representations of multiplex assemblies.
 
-        Args: 
-            Output_prefix: path to output folder, 
+        Args:
+            Output_prefix: path to output folder,
 
 
 
@@ -487,10 +483,10 @@ class ggDesigner:
 
 
     def gg_instructions(self, output_path: str, assembly_name: str):
-        """Generates human readable or machine specific instructions 
+        """Generates human readable or machine specific instructions
         this will just boil down to a table of what plasmids to include and where they are
-        I will save this in the appropriate folder - but I'd like to make it possible to 
-        run a gg_lvl1 with an option to start here from an existing folder full of plasmids 
+        I will save this in the appropriate folder - but I'd like to make it possible to
+        run a gg_lvl1 with an option to start here from an existing folder full of plasmids
         to be assembled - e.g. if you realize you want to use a different machine.
         this might actaully be clearer as a separate command simlar to batch.
         """
@@ -613,9 +609,9 @@ class ggDesigner:
                     parts_list = first_row['parts']  # Get the full parts list
                     for idx, (_, row) in enumerate(group.iterrows()):
                         plate, well = row['wells']
-                        if plate == None:
+                        if plate is None:
                             plate = "not found"
-                        if well == None:
+                        if well is None:
                             well = "??"
                         part_name = parts_list[idx] if idx < len(parts_list) else 'part'
 
@@ -634,26 +630,25 @@ class ggDesigner:
 
 
 
-    def _get_template_position(self, template_name: str) -> Tuple[Optional[str], Optional[str]]:
+    def _get_template_position(self, template_name: str) -> tuple[Optional[str], Optional[str]]:
         """Find the plate and well position for a given template.
-        
+
         First checks if the template is a contig/chromosome in the genome mapping file,
         then checks the template plates Excel file for individual templates.
         Searches both public and private template directories.
-        
+
         Args:
             template_name: Name of the template or genome contig to locate
-            
+
         Returns:
             Tuple containing:
                 - Plate name/barcode (or None if not found)
                 - Well position (or None if not found)
                 Format of well position is standard 96-well notation (e.g., 'A1', 'H12')
-                
+
         Raises:
             FileNotFoundError: If required mapping files aren't found
         """
-        from pathlib import Path
 
         # Construct private template directory path
         private_template_folder = get_templates_path(private=True)
@@ -710,13 +705,13 @@ class ggDesigner:
 
     def find_templates(self, template_folder: Path) -> None:
         """Find template matches for each assembly component.
-        
+
         Uses template functions from sequence_utils to identify potential
         templates for each sequence and rationalize the selections.
-        
+
         Args:
             template_folder: Path to folder containing template files
-            
+
         Raises:
             ValueError: If no sequences have been selected for assembly
         """
