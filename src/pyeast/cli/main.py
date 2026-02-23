@@ -1045,15 +1045,16 @@ def init(data_dir, output_dir):
     if config.data_dir.exists():
         # Already configured — show current state and offer to reconfigure
         console.print(f"[green]Data directory:[/green] {config.data_dir}")
-        console.print(f"[dim]Output directory: {config.output_dir}[/dim]")
+        console.print(f"[green]Output directory:[/green] {config.output_dir}")
 
         if not click.confirm("\nWould you like to reconfigure?", default=False):
             return
 
-        console.print("\n[cyan]How would you like to configure the data directory?[/cyan]")
-        console.print("  1. Enter a path to an existing data directory")
-        console.print("  2. Clone the public PYEAST data repository to ~/.pyeast/data-repo/")
-        choice = click.prompt("Choice", type=click.Choice(["1", "2"]))
+        console.print("\n[cyan]What would you like to reconfigure?[/cyan]")
+        console.print("  1. Data directory (enter existing path)")
+        console.print("  2. Data directory (clone PYEAST data repository)")
+        console.print("  3. Output directory")
+        choice = click.prompt("Choice", type=click.Choice(["1", "2", "3"]))
 
         if choice == "1":
             new_path = click.prompt("Data directory path", type=click.Path())
@@ -1063,7 +1064,17 @@ def init(data_dir, output_dir):
                 raise click.Abort()
             _write_config(target.resolve(), None)
             console.print(f"[green]Configured PYEAST to use data at {target}[/green]")
+            console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
             return
+
+        if choice == "3":
+            new_output = click.prompt("Output directory path", type=click.Path())
+            output_path = Path(new_output)
+            _write_config(config.data_dir, output_path.resolve())
+            console.print(f"[green]Output directory set to {output_path}[/green]")
+            console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
+            return
+
         # choice == "2" falls through to clone logic below
 
     # Clone the public data repo
