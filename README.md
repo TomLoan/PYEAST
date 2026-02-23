@@ -11,7 +11,7 @@ For full methodological details, see our [pre-print on BioRxiv](https://doi.org/
 
 ## Prerequisites
 
-- **Python** (3.9 or later) — [python.org](https://www.python.org/downloads/)
+- **Python** (3.12 or later) — [python.org](https://www.python.org/downloads/)
 - **Git** — [git-scm.com](https://git-scm.com/downloads)
 
 ## Installation
