@@ -13,11 +13,12 @@ For full methodological details, see our [pre-print on BioRxiv](https://doi.org/
 
 - **Python** (3.12 or later) — [python.org](https://www.python.org/downloads/)
 - **Git** — [git-scm.com](https://git-scm.com/downloads)
+- **uv** - [docs.astral.sh](https://docs.astral.sh/uv/getting-started/installation/)
 
 ## Installation
 
 ```bash
-pip install git+https://github.com/TomLoan/PYEAST.git
+uv tool install git+https://github.com/TomLoan/PYEAST.git
 
 # Download the sequence data automatically
 pyeast init
@@ -37,10 +38,10 @@ Run `pyeast --help` to see all available commands:
 |---|---|
 | `pyeast tar` | Design primers for Transformation-Assisted Recombination (TAR) cloning |
 | `pyeast integrate` | Design primers for chromosomal integration |
-| `pyeast del` | Design deletion cassettes (scarless marker-recycling method) |
-| `pyeast replace` | Design replacement cassettes |
+| `pyeast delete` | Design deletion cassettes (scarless marker-recycling method) |
+| `pyeast replace` | Design replacement cassettes (scarless marker-recycling method)|
 | `pyeast gg` | Design Golden Gate / MoClo assemblies |
-| `pyeast batch` | Regenerate instruction files for previously designed experiments |
+| `pyeast batch` | Regenerate instruction files for previously designed assemblies |
 | `pyeast init` | Configure the data directory |
 
 For help with any command: `pyeast COMMAND --help`
@@ -139,4 +140,4 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for details
 
 If you use PYEAST in your research, please cite:
 
-> Tom Loan et al. (2025). *PYEAST: a Python toolkit for yeast genetic engineering.* bioRxiv. https://doi.org/10.1101/2025.05.19.655004
+> Loan et al. (2025). *PYEAST: Python Enabled Automated Strain Transformation.* bioRxiv. https://doi.org/10.1101/2025.05.19.655004
