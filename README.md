@@ -59,7 +59,8 @@ Design cassettes for deleting or replacing genes using the scarless marker-recyc
 
 ## Beta feature: Golden Gate / MoClo Assembly
 
-~~~~ Still in Beta, please double check outputs ~~~~
+== Still in Beta, please double check outputs ==
+
 Design Golden Gate assemblies using the MoClo standard. The following part libraries are included out of the box:
 
 | Kit | Reference |
