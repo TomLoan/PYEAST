@@ -44,7 +44,8 @@ class PyeastConfig:
             if path.exists():
                 return path.resolve()
 
-        # Priority 3: Default user directory
+        # Priority 3: Ufault user directory Fallback for legancy installs 
+        # Not intended for normal use
         return (Path.home() / "PYEAST" / "data").resolve()
 
     def _resolve_output_dir(self) -> Path:
@@ -65,7 +66,7 @@ class PyeastConfig:
         if config_data and 'output_dir' in config_data:
             return Path(config_data['output_dir']).resolve()
 
-        # Priority 3: Default user directory
+        # Priority 3: Default user directory  
         return (Path.home() / "PYEAST" / "output").resolve()
 
     def _load_config_file(self) -> Optional[dict]:

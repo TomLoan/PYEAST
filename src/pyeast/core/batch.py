@@ -111,7 +111,7 @@ class BatchDesigner:
         self.pcr_reactions = {}
         self.reuse_limit = reuse_limit
         self.batched_reactions = []
-        self.output_folder.mkdir(exist_ok=True)
+        self.output_folder.mkdir(parents=True, exist_ok=True)
 
     def load_constructs(self) -> None:
         """Load available constructs from output directory and subfolders.
@@ -205,6 +205,7 @@ class BatchDesigner:
         if not self.available_constructs:
             raise ValueError(
                 "No valid GenBank files found for batch processing.\n"
+                "Ensure Output directory is correct. \n" 
                 "Make sure you've run 'tar' or 'integrate' commands first to generate constructs."
             )
 

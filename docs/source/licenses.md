@@ -73,8 +73,7 @@
 | sphinxcontrib-jsmath          | 1.0.1     | BSD License                                                                                      |
 | sphinxcontrib-qthelp          | 1.0.3     | BSD License                                                                                      |
 | sphinxcontrib-serializinghtml | 1.1.5     | BSD License                                                                                      |
-| tblib                         | 1.7.0     | BSD License                                                                                      |
-| test-project                  | 0.1.0     | UNKNOWN                                                                                          |
+| tblib                         | 1.7.0     | BSD License                                                                                      |                                                       |
 | toml                          | 0.10.2    | MIT License                                                                                      |
 | tomli                         | 2.0.1     | MIT License                                                                                      |
 | tomlkit                       | 0.11.0    | MIT License                                                                                      |
