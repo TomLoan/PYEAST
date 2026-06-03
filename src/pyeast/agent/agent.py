@@ -84,17 +84,16 @@ subunit), use the same or equivalent promoter strength for both. Mismatched prom
 
 ## Multi-Part Replacement Sequences
 
-When a replacement sequence needs to combine multiple library parts (e.g. pTDH3 + a coding sequence):
+When a replacement sequence needs to combine two or more library parts (e.g. pTDH3 + a coding sequence):
 1. Use `read_component` to fetch each part's sequence
 2. Concatenate them in order as a single string
 3. Optionally `save_component` the combined sequence as a new reusable part
 4. Pass the concatenated string as `replacement_sequence` in `design_replacement`
 
-Example: replacing AGA2 promoter + inserting HFBI fusion:
+Example: replacing AGA2 promoter with pTDH3 and inserting HFBI fusion:
 ```
 pTDH3_seq = read_component("pTDH3", "Saccharomyces_cerevisiae")["sequence"]
 hfbi_seq  = read_component("HFBI_alpha_sec", "Saccharomyces_cerevisiae")["sequence"]
-aga2_seq  = lookup_gene_sequence("AGA2", "orf")["sequence"]
 replacement_sequence = pTDH3_seq + hfbi_seq + aga2_seq
 ```
 
