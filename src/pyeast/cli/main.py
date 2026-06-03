@@ -1542,5 +1542,22 @@ def gg(library):
         console.print(f"[red]Error: {str(e)}[/red]")
         raise click.Abort()
 
+@cli.command()
+@click.option("--model", default="claude-sonnet-4-6", show_default=True, help="Claude model to use.")
+def agent(model: str) -> None:
+    """Start an interactive LLM-powered experiment design session.
+
+    \b
+    Describe your experiment in plain language and the agent will:
+    - discover available components and libraries
+    - design TAR cloning or gene deletion experiments
+    - explain results and next wet-lab steps
+
+    Requires ANTHROPIC_API_KEY to be set (see .env.example).
+    """
+    from pyeast.agent import run_agent
+    run_agent(model=model)
+
+
 if __name__ == '__main__':
     cli()
