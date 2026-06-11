@@ -7,7 +7,7 @@ PYEAST is a command-line toolkit that automates the design of DNA cloning experi
 
 If you are new to yeast cloning, PYEAST is designed to complement standard wet-lab protocols: it handles the computational design steps so you can focus on the biology.
 
-For full methodological details, see our [pre-print on BioRxiv](https://doi.org/10.1101/2025.05.19.655004).
+For full methodological details, see our [publication](https://doi.org/10.1038/s41540-026-00712-4).
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ Design primers for inserting a DNA construct into a specific locus in the yeast 
 
 ## Gene Deletion and Replacement
 
-Design cassettes for deleting or replacing genes using the scarless marker-recycling method described by [Akada et al., 2006](https://doi.org/10.1002/yea.1362).
+Design cassettes for deleting or replacing genes using the scarless marker-recycling method described by [Akada et al., 2006](https://doi.org/10.1002/yea.1365).
 
 ## Beta feature: Golden Gate / MoClo Assembly
 
@@ -140,4 +140,4 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for details
 
 If you use PYEAST in your research, please cite:
 
-> Loan et al. (2025). *PYEAST: Python Enabled Automated Strain Transformation.* bioRxiv. https://doi.org/10.1101/2025.05.19.655004
+> Madika, A., Suri, A., Purohit, A. et al. PYEAST – A Computational Toolkit for Saccharomyces cerevisiae Genetic Engineering. npj Syst Biol Appl 12, 83 (2026). https://doi.org/10.1038/s41540-026-00712-4
