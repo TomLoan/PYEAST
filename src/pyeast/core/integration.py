@@ -25,34 +25,63 @@ Integration designer for integrations of DNA sequences into the genome of S. cer
 
 
 
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
 
-import click
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.shortcuts import confirm
-from rich.console import Console
-from rich.table import Table
 
-from ..utils.primer_utils import design_linear_primers, get_primer_locations, rationalize_primers
-from ..utils.sequence_utils import assemble_parts_linear, get_templates, load_sequences, rationalize_templates, write_linear_instructions
+from pyeast.utils.path_utils import get_integration_sites_path
+from pyeast.utils.primer_utils import design_linear_primers, get_primer_locations, rationalize_primers
+from pyeast.utils.sequence_utils import assemble_parts_linear, get_templates, load_sequences, rationalize_templates, write_linear_instructions
+
+
+@dataclass
+class IntegrationResult:
+    """Result of an integration cloning design run."""
+    name: str
+    assembly: SeqRecord
+    primers: dict
+    instructions: list
+    missing_primers: dict = field(default_factory=dict)
+
+    def save(self, output_prefix: Path) -> None:
+        """Save GenBank file and TSV outputs.
+
+        Args:
+            output_prefix: Path stem for output files, e.g. Path("output/my_construct/my_construct").
+                Files are written as <output_prefix>.gb, <output_prefix>_instructions.tsv, etc.
+        """
+        output_prefix = Path(output_prefix)
+        SeqIO.write(self.assembly, f"{output_prefix}.gb", "genbank")
+
+        with open(f"{output_prefix}_all_primers.tsv", "w") as f:
+            f.write("Name\tSequence\n")
+            for name, seq in self.primers.items():
+                f.write(f"{name}\t{seq}\n")
+
+        if self.missing_primers:
+            with open(f"{output_prefix}_missing_primers.tsv", "w") as f:
+                f.write("Name\tSequence\n")
+                for name, info in self.missing_primers.items():
+                    f.write(f"{name}\t{info[0]['sequence']}\n")
+
+        with open(f"{output_prefix}_instructions.tsv", "w") as f:
+            f.write("Part\tF_Plate\tF_Name\tF_Well\tR_Plate\tR_Name\tR_Well\tTemplate\tSize\n")
+            for row in self.instructions:
+                f.write("\t".join(map(str, row)) + "\n")
 
 
 class IntegrationDesigner:
     def __init__(self, homology_length: int = 25):
         self.homology_length = homology_length
-        self.console = Console()
-        self.session = PromptSession()
 
         # State storage
         self.components = {}
-        self.int_sites = {} #all opitoins for integration sites
+        self.int_sites = {}  # all options for integration sites
         self.assembly_sequences = []
-        self.int_site = None #chosen integration site
+        self.int_site = None  # chosen integration site name
         self.primers = {}
         self.primers_found = {}
         self.missing_primers = {}
@@ -63,11 +92,9 @@ class IntegrationDesigner:
 
     def load_sequences(self, components_dir: Path) -> None:
         """Load component sequences and integration sites."""
-        # Load components
         self.components = load_sequences(components_dir)
 
-        # Load integration sites from standard location
-        int_sites_dir = Path("data/integration sites")
+        int_sites_dir = get_integration_sites_path()
         self.int_sites = self._load_int_sites(int_sites_dir)
 
         if not self.components:
@@ -75,92 +102,41 @@ class IntegrationDesigner:
         if not self.int_sites:
             raise ValueError("No integration sites found")
 
+    def set_assembly_order(self, assembly_order: list[str], integration_site_name: str) -> None:
+        """Set assembly sequences from component names and an integration site name.
 
-    def get_assembly_selections(self) -> None:
-        """Get user selections and return ordered list of sequences for assembly."""
-        component_completer = WordCompleter(list(self.components.keys()), ignore_case=True)
-        int_site_completer = WordCompleter(list(self.int_sites.keys()), ignore_case=True)
+        Args:
+            assembly_order: Ordered list of component names (must be present in self.components).
+            integration_site_name: Name of the integration site (must be present in self.int_sites).
 
-        while True:
-            try:
-                # Print available sequences first
-                self.print_sequence_grid(self.components, "Available Components")
-                self.print_integration_sites(self.int_sites,"\n[bold cyan]Available Integration Sites:[/bold cyan]")
-                # for site in self.int_sites.keys():
-                #     self.console.print(f"  {site}")
+        Raises:
+            ValueError: If any name is not found in the loaded sequences.
+        """
+        invalid_components = [n for n in assembly_order if n not in self.components]
+        if invalid_components:
+            raise ValueError(f"Unknown component(s): {', '.join(invalid_components)}")
 
-                # Ask for components
-                user_input = self.session.prompt(
-                    "\nEnter the names of the components you want to assemble, in order (space-separated): ",
-                    completer=component_completer
-                )
+        matches = [s for s in self.int_sites if s.lower() == integration_site_name.lower()]
+        if not matches:
+            raise ValueError(f"Unknown integration site: {integration_site_name}")
 
-                self.console.print(f"Got user input: {user_input}")  # Debug print
+        self.int_site = matches[0]
+        upstream_seq, downstream_seq = self.int_sites[self.int_site]
+        component_seqs = [self.components[n] for n in assembly_order]
+        self.assembly_sequences = [upstream_seq] + component_seqs + [downstream_seq]
 
-                # Get component sequences
-                component_seqs = []
-                for name in user_input.split():
-                    matches = [comp for comp in self.components.keys()
-                            if comp.lower() == name.lower()]
-                    if matches:
-                        component_seqs.append(self.components[matches[0]])
-                    else:
-                        raise ValueError(f"Invalid component name: {name}")
-
-                self.console.print(f"Found {len(component_seqs)} component sequences")  # Debug print
-
-                # Get integration site
-                while True:
-                    int_site = self.session.prompt(
-                        "\nEnter the name of the integration site: ",
-                        completer=int_site_completer
-                    )
-
-                    matches = [site for site in self.int_sites.keys()
-                            if site.lower() == int_site.lower()]
-                    if matches:
-                        upstream_seq, downstream_seq = self.int_sites[matches[0]]
-                        self.console.print(f"Found integration site: {matches[0]}")  # Debug print
-                        break
-                    else:
-                        self.console.print(f"[red]Invalid integration site name: {int_site}[/red]")
-
-                # Show selection and confirm
-                self.console.print("\n[green]Selected assembly:[/green]")
-                self.console.print("Components:")
-                for i, seq in enumerate(component_seqs, 1):
-                    self.console.print(f"{i}. {seq.id}")
-                self.console.print(f"Integration site: {int_site}")
-
-                if click.confirm("Is this correct?"):
-                    assembled_sequences = [upstream_seq] + component_seqs + [downstream_seq]
-                    #self.console.print(f"Returning {len(assembled_sequences)} sequences")  # Debug print
-                    self.assembly_sequences = assembled_sequences
-                    return
-                else:
-                    self.console.print("Let's try again.")
-                    continue
-
-            except ValueError as e:
-                self.console.print(f"[red]Error: {e}[/red]")
-            except KeyboardInterrupt:
-                if confirm("\nCancel selection?"):
-                    raise KeyboardInterrupt
-
-    def _load_int_sites(self, directory: Path = None) -> Dict[str, Tuple[SeqRecord, SeqRecord]]:
+    def _load_int_sites(self, directory: Path = None) -> dict[str, tuple[SeqRecord, SeqRecord]]:
         """Load integration sites from both public and private directories.
-        
+
         Each site should have two sequences: upstream and downstream homology.
         """
         if directory is None:
-            directory = Path("data/integration sites")
+            directory = get_integration_sites_path()
 
-        # Also check private directory
-        private_dir = Path("data/private/integration sites")
+        private_dir = get_integration_sites_path(private=True)
 
         int_sites = {}
 
-        # Load from both public and private directories
         for search_dir in [directory, private_dir]:
             if not search_dir.exists():
                 continue
@@ -171,93 +147,50 @@ class IntegrationDesigner:
                     site_name = file_path.stem
                     int_sites[site_name] = (records[0], records[1])
                 else:
-                    self.console.print(f"[yellow]Warning: Skipping {file_path.name} - expected 2 sequences, found {len(records)}[/yellow]")
+                    import warnings
+                    warnings.warn(
+                        f"Skipping {file_path.name} - expected 2 sequences, found {len(records)}"
+                    )
 
         if not int_sites:
-            self.console.print(f"[red]Integration sites directory not found: {directory}[/red]")
             raise FileNotFoundError(f"Integration sites directory not found: {directory}")
 
         return int_sites
 
-    def design_integration_primers(self) -> Dict[str, Seq]:
+    def design_integration_primers(self) -> dict[str, Seq]:
         """Design integration primers with the necesary overhangs
-        
-        uses the design_linear_primers function from primer_utils to design primers 
-        for the selected assembly sequences. 
-        
-        Returns: 
+
+        uses the design_linear_primers function from primer_utils to design primers
+        for the selected assembly sequences.
+
+        Returns:
             Dictionary mapping primer names to their sequence
-            
-        Raises: 
-            ValueError: If no sequences have been selected for assembly. 
+
+        Raises:
+            ValueError: If no sequences have been selected for assembly.
         """
 
         if not self.assembly_sequences:
             raise ValueError("No sequences selected for assembly. Please select sequences first")
 
-
         self.primers = design_linear_primers(
-                self.assembly_sequences[1:-1],  # middle components
-                (self.assembly_sequences[0], self.assembly_sequences[-1]),  # int sites
-                target_tm=50,
-                homology_length=self.homology_length
-            )
+            self.assembly_sequences[1:-1],  # middle components
+            (self.assembly_sequences[0], self.assembly_sequences[-1]),  # int sites
+            target_tm=50,
+            homology_length=self.homology_length
+        )
         return self.primers
-
-    def print_sequence_grid(self, sequences: Dict[str, SeqRecord], title: str = "Available Sequences"):
-        """Print the available sequences in a grid format.
-        
-        Args:
-            sequences: Dictionary of sequences to display
-            title: Title for the sequence table
-        """
-        table = Table(title=title)
-        table.add_column("Name", style="cyan")
-        table.add_column("Length", justify="right", style="green")
-        table.add_column("Description", style="white")
-
-        for name, seq in sequences.items():
-            table.add_row(
-                name,
-                f"{len(seq)} bp",
-                seq.description[:150] + "..." if len(seq.description) > 149 else seq.description
-            )
-
-        self.console.print(table)
-
-    def print_integration_sites(self, sites: Dict[str, Tuple[SeqRecord, SeqRecord]], title: str = "Available Integration Sites"):
-        """Display integration sites in a formatted table.
-        
-        Args:
-            sites: Dictionary mapping site names to (upstream, downstream) sequence tuples
-            title: Title for the table
-        """
-        table = Table(title=title)
-        table.add_column("Name", style="cyan")
-        table.add_column("Up", justify="right", style="green")
-        table.add_column("Down", justify="right", style="green")
-        table.add_column("Description", style="white")
-
-        for name, (up_seq, down_seq) in sites.items():
-            table.add_row(
-                name,
-                f"{len(up_seq)} bp",
-                f"{len(down_seq)} bp",
-                up_seq.description[:150] + "..." if len(up_seq.description) > 149 else up_seq.description
-            )
-
-        self.console.print(table)
 
     def check_primer_locations(self, primer_folder: Path) -> None:
         """Check for exisiting primers stored in plates
-        
-        Uses primer locations functions from primer_utils to find exisiting primers in 
-        IDT plate maps  and identify which primers need to be ordered. 
-        
-        Args: 
+
+        Uses primer locations functions from primer_utils to find exisiting primers in
+        IDT plate maps  and identify which primers need to be ordered.
+
+        Args:
             primer_folder: Path to folder containing primer Excel files
 
-        Raises: 
+        Raises:
             ValueError: if primers haven't been desinged yet
         """
 
@@ -269,17 +202,17 @@ class IntegrationDesigner:
             str(primer_folder)
         )
 
-    def rationalize_selections(self) -> Tuple[Dict[str, Dict], Dict[str, str]]:
+    def rationalize_selections(self) -> tuple[dict[str, dict], dict[str, str]]:
         """Rationalize primer and template selections to minimize plate usage.
-        
+
         Uses rationalization functions from primer_utils to optimize primer plate
         usage and template selections.
-        
+
         Returns:
             Tuple containing:
                 - Dictionary of rationalized primer selections
                 - Dictionary of rationalized template selections
-                
+
         Raises:
             ValueError: If primer locations or templates haven't been checked
         """
@@ -296,13 +229,12 @@ class IntegrationDesigner:
 
         self.rationalized_templates = rationalize_templates(self.template_dict)
 
+    def write_instructions(self) -> list[list[str]]:
+        """Generate assembly instructions for the integration experiment.
 
-    def write_instructions(self) -> List[List[str]]:
-        """Generate assembly instructions for the TAR cloning experiment.
-        
         Returns:
             List of instruction rows containing primer and template details
-            
+
         Raises:
             ValueError: If primers and templates haven't been rationalized
         """
@@ -321,16 +253,15 @@ class IntegrationDesigner:
             self.homology_length
         )
 
-
     def find_templates(self, template_folder: Path) -> None:
         """Find template matches for each assembly component.
-        
+
         Uses template functions from sequence_utils to identify potential
         templates for each sequence and rationalize the selections.
-        
+
         Args:
             template_folder: Path to folder containing template files
-            
+
         Raises:
             ValueError: If no sequences have been selected for assembly
         """
@@ -338,43 +269,13 @@ class IntegrationDesigner:
             raise ValueError("No sequences selected. Please select sequences first.")
 
         self.template_dict = get_templates(self.assembly_sequences, str(template_folder))
-        #self.console.print(self.template_dict)
-
-    def display_instructions(self, instructions: List[List[str]]):
-        """Display assembly instructions in a formatted table"""
-        table = Table(title="Assembly Instructions")
-        table.add_column("Part Name", style="bold cyan")
-        table.add_column("Fwd Primer", style="green")
-        table.add_column("Fwd Plate", style = "bold cyan")
-        table.add_column("Well", style="bold blue")
-        table.add_column("Rev Primer", style="green")
-        table.add_column("Rev Plate", style = "bold cyan")
-        table.add_column("Well", style="bold blue")
-        table.add_column("Template", style="magenta")
-        table.add_column("Size", justify="right")
-
-        for line in instructions:
-            table.add_row(
-                str(line[0]),  # Part name
-                str(line[2]),   # Fwd primer name
-                str(line[1] if line[1] != "N/A" else "[bold red]Not found[/bold red]"), # Fwd primer plate
-                str(line[3] if line[3] != "N/A" else "[bold red]Not found[/bold red]"),  # Fwdc well
-                str(line[5]),  # Rev primer name
-                str(line[4] if line[4] != "N/A" else "[bold red]Not found[/bold red]"),   # Rev primer Plate
-                str(line[6] if line[6] != "N/A" else "[bold red]Not found[/bold red]"),  # Rev well
-                str(line[7] if line[7] != "Not found" else "[bold red]Not found[/bold red]"), #Template
-                str(line[8])  # Amplicon Size
-            )
-
-        self.console.print(table)
-
 
     def create_linear_assembly(self) -> SeqRecord:
         """Create the assembled sequence with all parts and primers.
-        
+
         Returns:
             SeqRecord object representing the assembled construct with features
-            
+
         Raises:
             ValueError: If no primers have been designed
         """
@@ -390,3 +291,59 @@ class IntegrationDesigner:
         )
 
         return self.final_assembly
+
+    def design(
+        self,
+        components_dir: Path,
+        assembly_order: list[str],
+        integration_site_name: str,
+        primer_folder: Path,
+        template_folder: Path,
+        name: str = "assembly",
+    ) -> IntegrationResult:
+        """Design a chromosomal integration experiment programmatically.
+
+        Runs the full design pipeline - load sequences, set assembly order, design primers,
+        find templates, rationalize selections, generate instructions, and assemble.
+
+        Args:
+            components_dir: Path to the component library directory (FASTA files).
+            assembly_order: Ordered list of component names to assemble (not including flanks).
+            integration_site_name: Name of the integration site (must be in data/integration_sites).
+            primer_folder: Path to primer plate library folder.
+            template_folder: Path to template folder.
+            name: Name for the assembled construct (default: "assembly").
+
+        Returns:
+            IntegrationResult containing the assembled construct, primers, instructions,
+            and any missing primers. Call result.save(output_prefix) to write files.
+
+        Example:
+            designer = IntegrationDesigner(homology_length=25)
+            result = designer.design(
+                components_dir=Path("data/component_libraries/Saccharomyces_cerevisiae"),
+                assembly_order=["GFP", "CYC1tt"],
+                integration_site_name="HO",
+                primer_folder=Path("data/primers"),
+                template_folder=Path("data/templates"),
+                name="GFP_integration",
+            )
+            result.save(Path("output/GFP_integration/GFP_integration"))
+        """
+        self.load_sequences(components_dir)
+        self.set_assembly_order(assembly_order, integration_site_name)
+        self.design_integration_primers()
+        self.check_primer_locations(primer_folder)
+        self.find_templates(template_folder)
+        self.rationalize_selections()
+        instructions = self.write_instructions()
+        assembly = self.create_linear_assembly()
+        assembly.name = name
+
+        return IntegrationResult(
+            name=name,
+            assembly=assembly,
+            primers=self.primers,
+            instructions=instructions,
+            missing_primers=self.missing_primers,
+        )

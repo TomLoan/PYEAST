@@ -18,7 +18,7 @@
 
 # src/pyeast/utils/primer_utils.py
 """
-Primer utilities for PYEAST. 
+Primer utilities for PYEAST.
 """
 
 # ===========================================================================
@@ -29,13 +29,15 @@ Primer utilities for PYEAST.
 
 
 import os
-from typing import Dict, List, Tuple
+from pathlib import Path
 
 import pandas as pd
 import primer3
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqUtils import MeltingTemp as mt
+
+from .path_utils import get_private_equivalent
 
 
 def design_screening_primers(sequence, target_start, target_end, primer_length=20, product_size_range=(500,1000)):
@@ -126,7 +128,7 @@ def design_primers(sequence, target_tm, tolerance=3):
     r_primer = adjust_primer(Seq(sequence[-50:]), False)
     return f_primer, r_primer
 
-def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[str, List], Dict[str, List]]:
+def get_primer_locations(primers: dict[str, Seq], directory: str) -> tuple[dict[str, list], dict[str, list]]:
     """
     Locate primers in IDT spec sheets within both public and private directories.
     Combines results from both locations - if a primer is found in multiple plates
@@ -144,7 +146,6 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
             - primers_found: Mapping of primer names to lists of matching locations.
             - primers_missing: Mapping of primer names to lists of missing primer information.
     """
-    from pathlib import Path
 
     primers_found = {}
     primers_missing = {}
@@ -152,15 +153,16 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
     # Convert to Path for easier manipulation
     public_dir = Path(directory)
 
-    # Construct private directory path
+    # Construct private directory path (if path is within data directory)
     try:
-        relative_path = public_dir.relative_to("data")
-        private_dir = Path("data/private") / relative_path
+        private_dir = get_private_equivalent(public_dir)
     except ValueError:
-        private_dir = Path("data/private") / public_dir.name
+        # Path is not within data directory, so no private equivalent exists
+        private_dir = None
 
     # Search both public and private directories for Excel files
-    for search_dir in [public_dir, private_dir]:
+    search_dirs = [public_dir] + ([private_dir] if private_dir else [])
+    for search_dir in search_dirs:
         if not search_dir.exists():
             continue
 
@@ -197,7 +199,7 @@ def get_primer_locations(primers: Dict[str, Seq], directory: str) -> Tuple[Dict[
     return primers_found, primers_missing
 
 
-def rationalize_primers(primers_found: Dict[str, List],  primers_missing : Dict[str, List]) -> Dict[str, List]:
+def rationalize_primers(primers_found: dict[str, list],  primers_missing : dict[str, list]) -> dict[str, list]:
     """
     Rationalize primer selection to minimize the number of unique plates or Box used.
 
@@ -240,10 +242,10 @@ def rationalize_primers(primers_found: Dict[str, List],  primers_missing : Dict[
 
     for primer_name, primer_info_list in primers_missing.items():
         selected_primers[primer_name] = primer_info_list[0]
-    
+
     return selected_primers
 
-def add_circular_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], overhang_length: int) -> Dict[str, Seq]:
+def add_circular_overhangs(primers: dict[str, Seq], parts: list[SeqRecord], overhang_length: int) -> dict[str, Seq]:
     """
     Add overhangs to primers for yeast assembly.
 
@@ -275,7 +277,7 @@ def add_circular_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], over
 
     return oh_oligos
 
-def design_circular_primers(parts: List[SeqRecord], target_tm=50, overhang_length=25):
+def design_circular_primers(parts: list[SeqRecord], target_tm=50, overhang_length=25):
     """
     Design TAR cloning primers for a set of DNA parts.
 
@@ -297,7 +299,7 @@ def design_circular_primers(parts: List[SeqRecord], target_tm=50, overhang_lengt
 
     return add_circular_overhangs(primers, parts, overhang_length)
 
-def add_linear_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], int_site: Tuple[SeqRecord, SeqRecord], overhang_length: int) -> Dict[str, Seq]:
+def add_linear_overhangs(primers: dict[str, Seq], parts: list[SeqRecord], int_site: tuple[SeqRecord, SeqRecord], overhang_length: int) -> dict[str, Seq]:
     """
     Add overhangs to primers for linear integration assembly.
 
@@ -340,8 +342,8 @@ def add_linear_overhangs(primers: Dict[str, Seq], parts: List[SeqRecord], int_si
 
     return oh_oligos
 
-def design_linear_primers(components: List[SeqRecord], int_site: Tuple[SeqRecord, SeqRecord],
-                               target_tm: float, homology_length: int) -> Dict[str, Seq]:
+def design_linear_primers(components: list[SeqRecord], int_site: tuple[SeqRecord, SeqRecord],
+                               target_tm: float, homology_length: int) -> dict[str, Seq]:
     """
     Design primers for integrating components at a specific site.
 

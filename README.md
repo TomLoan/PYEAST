@@ -1,67 +1,222 @@
 [![DOI](https://zenodo.org/badge/946400824.svg)](https://doi.org/10.5281/zenodo.15393309)
 [![Installation Test](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml/badge.svg)](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml)
 
-# PYEAST v1.1.1
+# PYEAST
 
-## Set of tools for yeast cloning, built on the CSIRO uv-python template. 
-## Quick start:
+PYEAST is a command-line toolkit and Python library that automates the design of DNA cloning experiments in *Saccharomyces cerevisiae* (baker's yeast). Given a set of genetic parts, it designs the PCR primers and liquid-handling instructions for common yeast genetic engineering techniques — reducing manual design work and minimising errors.
 
-### Prerequisites
+If you are new to yeast cloning, PYEAST is designed to complement standard wet-lab protocols: it handles the computational design steps so you can focus on the biology.
 
-UV, Git
+For full methodological details, see our [pre-print on BioRxiv](https://doi.org/10.1101/2025.05.19.655004).
 
-#### Install uv
+## Prerequisites
 
-To install uv, see the instructions: https://docs.astral.sh/uv/getting-started/installation/, but in short:
+- **Python** (3.12 or later) — [python.org](https://www.python.org/downloads/)
+- **Git** — [git-scm.com](https://git-scm.com/downloads)
+- **uv** - [docs.astral.sh](https://docs.astral.sh/uv/getting-started/installation/)
 
-In bash on (most) Linux systems and Mac:
+## Installation
+
 ```bash
-curl -LsSf https://astral.sh/uv/0.4.6/install.sh | sh
-# restart your shell and make sure `uv --version` works
+uv tool install git+https://github.com/TomLoan/PYEAST.git
+
+# Download the sequence data automatically
+pyeast init
 ```
 
-In Windows, from any shell run:
-```shell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex" # windows
-# restart your shell and make sure `uv --version` works
+`pyeast init` clones the [data repository](https://github.com/TomLoan/PYEAST_data) to `~/.pyeast/data-repo/` and configures PYEAST automatically. If you have already downloaded the data elsewhere, point PYEAST at it instead:
+
+```bash
+pyeast init --data-dir /path/to/PYEAST_data
 ```
 
-# Clone the repo
-```shel
+## Commands
+
+Run `pyeast --help` to see all available commands:
+
+| Command | Description |
+|---|---|
+| `pyeast tar` | Design primers for Transformation-Assisted Recombination (TAR) cloning |
+| `pyeast integrate` | Design primers for chromosomal integration |
+| `pyeast delete` | Design deletion cassettes (scarless marker-recycling method) |
+| `pyeast replace` | Design replacement cassettes (scarless marker-recycling method)|
+| `pyeast gg` | Design Golden Gate / MoClo assemblies |
+| `pyeast batch` | Regenerate instruction files for previously designed assemblies |
+| `pyeast init` | Configure the data directory |
+
+For help with any command: `pyeast COMMAND --help`
+
+## TAR Cloning
+
+Transformation-Assisted Recombination (TAR) exploits *S. cerevisiae*'s natural homologous recombination to assemble PCR products into new plasmids in a single yeast transformation. PYEAST designs all primers, including the homology overhangs, for each part in your assembly.
+
+## Chromosomal Integration
+
+Design primers for inserting a DNA construct into a specific locus in the yeast genome. PYEAST calculates the flanking homology sequences required for efficient integration.
+
+## Gene Deletion and Replacement
+
+Design cassettes for deleting or replacing genes using the scarless marker-recycling method described by [Akada et al., 2006](https://doi.org/10.1002/yea.1362).
+
+## Beta feature: Golden Gate / MoClo Assembly
+
+== Beta feature, please double check outputs ==
+
+Design Golden Gate assemblies using the MoClo standard. The following part libraries are included out of the box:
+
+| Kit | Reference |
+|---|---|
+| Yeast ToolKit (YTK) | [Lee et al., 2015](http://doi.org/10.1021/sb500366v) — [Addgene](https://www.addgene.org/kits/moclo-ytk/) |
+| Yeast Secretion and Display Toolkit | [O'Riordan et al., 2023](https://doi.org/10.1021/acssynbio.3c00743) — [Addgene](https://www.addgene.org/kits/young-moclo-ysd/) |
+| OPENPichia MoClo Kit | [Claes et al., 2024](https://www.nature.com/articles/s41564-023-01574-w) — [BCCM](https://bccm.belspo.be/GeneCorner-OPENPichia) |
+
+To add parts to an existing kit, save a FASTA file to `component_libraries/<kit_name>/` in your data directory. For liquid-handling support, also save the matching plasmid `.gb` file to `component_libraries/<kit_name>/plasmids/` and add a well entry to `templates/TemPlates.xlsx`.
+
+To add a new Golden Gate kit, create a new subfolder in `component_libraries/` and follow the same structure.
+
+## Private Data
+
+You can store proprietary sequences, primers, and templates in a `private/` subdirectory of your data folder. PYEAST searches both public and private locations automatically, and the private folder is excluded from version control.
+
+```
+<data directory>/
+├── component_libraries/       ← public parts
+├── integration_sites/
+├── primers/
+├── templates/
+└── private/
+    ├── component_libraries/   ← your private parts (gitignored)
+    ├── integration_sites/
+    ├── primers/
+    └── templates/
+```
+
+When you run `pyeast init`, the `private/` folder structure is created automatically.
+
+## Configuration
+
+PYEAST looks for data in this order:
+
+1. Environment variable: `PYEAST_DATA_DIR`
+2. Config file: `~/.pyeast/config.yaml`
+3. Default: `~/PYEAST/data/`
+
+To view or update your current configuration, run `pyeast init`.
+
+## Troubleshooting
+
+**"Data directory not found"**
+
+Run `pyeast init` to check what path is configured. To reconfigure:
+
+```bash
+pyeast init --data-dir /correct/path/to/PYEAST_data
+```
+
+**Commands fail with missing files**
+
+Verify that your data directory contains the expected folder structure and that FASTA/Excel files are present in the right locations.
+
+**Import errors on startup**
+
+Reinstall to ensure all dependencies are present:
+
+```bash
+pip install git+https://github.com/TomLoan/PYEAST.git
+```
+
+## Python API
+
+All designer classes can be imported and called directly — no interactive prompts, no CLI required. This is useful for scripting, Jupyter notebooks, or integrating PYEAST into larger pipelines.
+
+Each designer follows the same pattern: create a designer, call `design()` with your inputs, get back a result object, and optionally call `result.save()` to write files.
+
+**TAR cloning**
+
+```python
+from pathlib import Path
+from pyeast.core.tar import TARDesigner
+from pyeast.utils.path_utils import get_component_libraries_path, get_primers_path, get_templates_path
+
+designer = TARDesigner(homology_length=25)
+result = designer.design(
+    library_path=get_component_libraries_path() / "YeastToolKit",
+    assembly_order=["pTEF1", "YeGFP", "tCYC1", "Ura3", "AmpR_ColE1", "2Micron"],
+    primer_folder=get_primers_path(),
+    template_folder=get_templates_path(),
+    name="my_plasmid",
+)
+result.save(Path("output/my_plasmid/my_plasmid"))
+# Writes: my_plasmid.gb, my_plasmid_instructions.tsv, my_plasmid_all_primers.tsv
+```
+
+**Chromosomal integration**
+
+```python
+from pyeast.core.integration import IntegrationDesigner
+
+designer = IntegrationDesigner(homology_length=25)
+result = designer.design(
+    components_dir=get_component_libraries_path() / "Saccharomyces_cerevisiae",
+    assembly_order=["pTEF1", "YeGFP", "tCYC1"],
+    integration_site_name="HO",
+    primer_folder=get_primers_path(),
+    template_folder=get_templates_path(),
+    name="GFP_integration",
+)
+result.save(Path("output/GFP_integration/GFP_integration"))
+```
+
+**Gene deletion**
+
+```python
+from pyeast.core.deletion import DeletionDesigner
+
+designer = DeletionDesigner(upstream_homology_len=300, downstream_homology_len=200)
+result = designer.design(
+    target_sequence="ATGCATGC...",  # sequence to delete
+    name="YFG1_deletion",
+)
+result.save(Path("output/YFG1_deletion/YFG1_deletion"))
+# Writes: .gb, .fasta, _screening_primers.tsv
+```
+
+**Gene replacement**
+
+```python
+from Bio import SeqIO
+from pyeast.core.replace import ReplaceDesigner
+
+replacement = SeqIO.read("pTEF1.fasta", "fasta")
+designer = ReplaceDesigner(upstream_homology_len=200)
+result = designer.design(
+    target_sequence="ATGCATGC...",  # sequence to replace
+    replacement_sequence=replacement,
+    marker_position="upstream",    # or "downstream"
+    name="YFG1_pTEF1_replace",
+)
+result.save(Path("output/YFG1_pTEF1_replace/YFG1_pTEF1_replace"))
+```
+
+The `genome_file` and `ura3_file` paths used by deletion and replacement designers default to the configured data directory. You can override them in the constructor:
+
+```python
+designer = DeletionDesigner(genome_file=Path("my_genome.fsa"), ura3_file=Path("URA3.fasta"))
+```
+
+## For Developers
+
+```bash
 git clone https://github.com/TomLoan/PYEAST.git
+cd PYEAST
+uv sync --group dev
+uv run pytest tests/ -v
 ```
 
-### Using PYEAST 
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-Run PYEAST in Command line
-```shell
-uv run pyeast
-```
-uv will handle the package management and create athe required virtual environment in the local directory. 
-Once this process is complete a range of commands will be printed to the terminal, use uv run pyeast command --help for more information on running each command
+## Citation
 
-Pyeast provides  useful functions for  your Saccharomyces cerevisiae cloning needs: 
-tar: Transformation assisted recombination is a cloning method that relies on S. cerevisiaes native capcity for homologous recombination to create new plasmids out of PCR products using homology added to the ends of PCR primers. 
-insert: Similar to tar this script designs PCR primers for insertion of new DNA into the chromosomes of S. cerevisiae 
-del: This script designs DNA fragments that can be used to delete regions of S. cerevisiae gDNA using the scarless method details by Akada et al 2006 (Yeast 23(5):399-405). 
-replace: Similar to del this script designs DNA fragments that can be used to replace regions of S. cerevisiae gDNA with a method based on that described by Akada et al 2006 (Yeast 23(5):399-405)
-batch: regenate instructions files for previously designed tar and integrate command outputs stored in the output file. You might need to do this for example after ordering primers or adding templates sequences to ./data/templates. 
+If you use PYEAST in your research, please cite:
 
-For more details see our [pre-print](https://doi.org/10.1101/2025.05.19.655004) on BioRxiv 
-
-
-## Version 1.1 Adds support for other liquid handling robots and for MoClo Golden gate assemblies. 
-
-The following Kits come preloaded: 
-- Yeast ToolKit: [Addgene](https://www.addgene.org/kits/moclo-ytk/) from [Lee at al, 2015](http://doi.org/10.1021/sb500366v)
-
-- Yeast Secretion and Display Toolkit: [Addgene](https://www.addgene.org/kits/young-moclo-ysd/) from [O'Riordan et al, 2023](https://doi.org/10.1021/acssynbio.3c00743)
-
-- OPENPichia MoClo Kit: [BCCM](https://bccm.belspo.be/GeneCorner-OPENPichia) from [Claes et al, 2024](https://www.nature.com/articles/s41564-023-01574-w)
-
-New components can be added to any oy these kits by saving a fasta file to .data/component libraries/*kit_name* and a gb file of the MoClo complatable lvl 0 plasmid to .data/components libraries/*kit_name*/plasmids. For liquid handling the plasmid name should be added to a well in .data/templates/TemPlates.xlsx.
-
-To add new golden gate kits save fasta files describing the parts to a new folder in data/component libraries and the lvl 0 plasmids saved in a plasmids subfolder in the same directory. For liquid handling it is often simpliest to save a new 96 plate in .data/templates/TemPlates.xlsx as a new sheet. Be sure the positions of these plasmids are accurate. 
-
-#### Private Data Support (New in v1.1)
-PYEAST now supports private data directories for proprietary sequences, primers, and templates. Create data/private/component_libraries/ and add your files - PYEAST automatically searches both public and private locations. See data/README.md for details.
+> Loan et al. (2025). *PYEAST: Python Enabled Automated Strain Transformation.* bioRxiv. https://doi.org/10.1101/2025.05.19.655004

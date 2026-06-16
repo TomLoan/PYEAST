@@ -28,18 +28,41 @@ This module provides tools for designing scarless deletion cassettes in S. cerev
 
 
 
-
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
-from prompt_toolkit import PromptSession
-from rich.console import Console
 
-from ..utils.primer_utils import design_screening_primers
+from pyeast.utils.path_utils import get_component_libraries_path, get_templates_path
+from pyeast.utils.primer_utils import design_screening_primers
+
+
+@dataclass
+class DeletionResult:
+    """Result of a deletion cassette design run."""
+    name: str
+    cassette: SeqRecord
+    forward_primer: str
+    reverse_primer: str
+    product_sizes: dict
+    genome_location: tuple  # (chrom_id, start, end, orientation)
+
+    def save(self, output_prefix: Path) -> None:
+        """Save GenBank, FASTA, and screening primers TSV.
+
+        Args:
+            output_prefix: Path stem, e.g. Path("output/my_deletion/my_deletion").
+        """
+        output_prefix = Path(output_prefix)
+        SeqIO.write(self.cassette, f"{output_prefix}.gb", "genbank")
+        SeqIO.write(self.cassette, f"{output_prefix}.fasta", "fasta")
+        with open(f"{output_prefix}_screening_primers.tsv", "w") as f:
+            f.write(f"{self.name}_ScreenF\t{self.forward_primer}\n")
+            f.write(f"{self.name}_ScreenR\t{self.reverse_primer}")
 
 
 class DeletionDesigner:
@@ -49,24 +72,23 @@ class DeletionDesigner:
                  upstream_homology_len: int = 300,
                  downstream_homology_len: int = 200,
                  repeat_length: int = 160,
-                 genome_file: Path = Path("data/templates/BY4741_Toronto_2012.fsa"),
-                 ura3_file: Path = Path("data/component libraries/Saccharomyces cerevisiae/URA3.fasta")):
+                 genome_file: Optional[Path] = None,
+                 ura3_file: Optional[Path] = None):
         """Initialize the DeletionDesigner.
-        
+
         Args:
             upstream_homology_len: Length of upstream homology for recombination (default: 300)
             downstream_homology_len: Length of downstream homology for recombination (default: 200)
             repeat_length: Length of repeat sequence for marker removal (default: 160)
-            genome_file: Path to the genome file (default: BY4741_Toronto_2012.fsa)
-            ura3_file: Path to the URA3 marker file
+            genome_file: Path to the genome file (default: BY4741_Toronto_2012.fsa from data directory)
+            ura3_file: Path to the URA3 marker file (default: URA3.fasta from data directory)
         """
-        self.upstream_homology_len = upstream_homology_len  # keeping variable name for compatibility
+        self.upstream_homology_len = upstream_homology_len
         self.downstream_homology_len = downstream_homology_len
         self.repeat_length = repeat_length
-        self.genome_file = genome_file
-        self.ura3_file = ura3_file
-        self.console = Console()
-        self.session = PromptSession()
+
+        self.genome_file = genome_file if genome_file is not None else get_templates_path() / "BY4741_Toronto_2012.fsa"
+        self.ura3_file = ura3_file if ura3_file is not None else get_component_libraries_path() / "Saccharomyces_cerevisiae" / "URA3.fasta"
 
         # State storage
         self.target_sequence = None
@@ -75,13 +97,13 @@ class DeletionDesigner:
         self.screening_primers = None
         self.product_sizes = None
 
-    def find_target_sequence(self, genome_file: Path, target_seq: str) -> Optional[Tuple[str, int, int, str]]:
+    def find_target_sequence(self, genome_file: Path, target_seq: str) -> Optional[tuple[str, int, int, str]]:
         """Locate a target sequence in the genome.
-        
+
         Args:
             genome_file: Path to the genome file
             target_seq: The DNA sequence to find
-            
+
         Returns:
             Tuple containing (chromosome_id, start, end, orientation) or None if not found
         """
@@ -99,15 +121,15 @@ class DeletionDesigner:
 
         return None
 
-    def extract_sequences(self, genome_seq: Seq, start: int, end: int, orientation: str) -> Tuple[Seq, Seq, Seq]:
+    def extract_sequences(self, genome_seq: Seq, start: int, end: int, orientation: str) -> tuple[Seq, Seq, Seq]:
         """Extract required sequences with correct orientation.
-        
+
         Args:
             genome_seq: Full genome sequence
             start: Start position of target
             end: End position of target
             orientation: Either "forward" or "reverse"
-            
+
         Returns:
             Tuple of (upstream_homology, downstream_homology, repeat)
         """
@@ -125,14 +147,14 @@ class DeletionDesigner:
 
     def make_deletion_cassette(self, genome_file: Path, ura3_file: Path) -> SeqRecord:
         """Create the deletion cassette with URA3 marker.
-        
+
         Args:
             genome_file: Path to the genome file
             ura3_file: Path to the URA3 marker file
-            
+
         Returns:
             SeqRecord object representing the deletion cassette
-            
+
         Raises:
             ValueError: If no target sequence has been found
         """
@@ -201,15 +223,15 @@ class DeletionDesigner:
         self.deletion_cassette = cassette
         return cassette
 
-    def design_screening_strategy(self, genome_file: Path) -> Tuple[str, str, Dict[str, int]]:
+    def design_screening_strategy(self, genome_file: Path) -> tuple[str, str, dict[str, int]]:
         """Design screening primers and calculate expected product sizes.
-        
+
         Args:
             genome_file: Path to the genome file
-            
+
         Returns:
             Tuple containing (forward_primer, reverse_primer, product_sizes)
-            
+
         Raises:
             ValueError: If no target sequence has been found
         """
@@ -252,3 +274,57 @@ class DeletionDesigner:
         self.product_sizes = product_sizes
 
         return forward_primer, reverse_primer, product_sizes
+
+    def design(
+        self,
+        target_sequence: str,
+        name: str = "deletion_cassette",
+        genome_location: Optional[tuple] = None,
+    ) -> DeletionResult:
+        """Design a deletion cassette programmatically.
+
+        Args:
+            target_sequence: DNA sequence to delete (A/T/G/C only).
+            name: Name for the output construct (default: "deletion_cassette").
+            genome_location: Optional pre-computed (chrom_id, start, end, orientation) tuple.
+                If provided, skips the genome search step (useful when you want to display
+                the location to the user interactively before committing to the design).
+
+        Returns:
+            DeletionResult containing the cassette, screening primers, product sizes,
+            and genome location. Call result.save(output_prefix) to write files.
+
+        Raises:
+            ValueError: If target_sequence is not found in the genome.
+
+        Example:
+            designer = DeletionDesigner(upstream_homology_len=300)
+            result = designer.design(
+                target_sequence="ATGCATGC...",
+                name="YFG1_deletion",
+            )
+            result.save(Path("output/YFG1_deletion/YFG1_deletion"))
+        """
+        self.target_sequence = target_sequence.upper()
+
+        if genome_location is not None:
+            self.genome_location = genome_location
+        else:
+            location = self.find_target_sequence(self.genome_file, self.target_sequence)
+            if location is None:
+                raise ValueError(f"Target sequence not found in genome: {self.genome_file}")
+            self.genome_location = location
+
+        cassette = self.make_deletion_cassette(self.genome_file, self.ura3_file)
+        cassette.name = name
+
+        fwd, rev, product_sizes = self.design_screening_strategy(self.genome_file)
+
+        return DeletionResult(
+            name=name,
+            cassette=cassette,
+            forward_primer=fwd,
+            reverse_primer=rev,
+            product_sizes=product_sizes,
+            genome_location=self.genome_location,
+        )

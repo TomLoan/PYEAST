@@ -29,61 +29,53 @@ Level 1 golden gate assemblies using the yeast Moclo standard from Lee et al 201
 
 
 import csv
-import warnings
+import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
-import click
 import dnacauldron as dc
 import openpyxl
 import pandas as pd
 from Bio import BiopythonDeprecationWarning, SeqIO
 from Bio.SeqRecord import SeqRecord
-from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.shortcuts import confirm
-from rich.console import Console
-from rich.table import Table
 
-from ..utils.sequence_utils import (
-    get_templates,
-    load_sequences,
-)
+from pyeast.utils.path_utils import get_private_equivalent, get_templates_path
+from pyeast.utils.sequence_utils import get_templates, load_sequences
+
+logger = logging.getLogger(__name__)
 
 
 class ggDesigner:
-    """A class for designing golden gate assemblies. 
-    
+    """A class for designing golden gate assemblies.
+
     This class handles the design assemblies. Uses the DNAcauldron package from the Edinborough bifoundry.
     """
 
     def __init__(self,
-                 template_folder: Path = Path("data/templates"),
-                 instruments: List = ['Janus', 'epMotion', 'Hamilton', 'Human'],
+                 template_folder: Optional[Path] = None,
+                 instruments: list = ['Janus', 'epMotion', 'Hamilton', 'Human'],
                  is_library: bool = False
                  ):
-        """Inintialise a new gg_lvl1 designer. 
-        
+        """Inintialise a new gg_lvl1 designer.
+
         Args:
-            template_folder: 
+            template_folder:
                 Path to a fold where the file catalogging plasmid positions in 96 well plates,
                  TemPlates.xlsx, is stored. Defaults to data/templates.
-            
-            Instruments: 
+
+            Instruments:
                 List of available instruments, each requires implementation so shouldn't be input by the user.
-            
-            is_library: 
+
+            is_library:
                 Bool that flags if the assembly is to be multiplexed in separate wells, or pooled to create a library.
-                Defauls to False to return separate assemblies. 
+                Defaults to False to return separate assemblies.
             """
         # File paths                     # These need to be user determined.
         self.gg_plasmids = None
-        self.template_folder = template_folder
+        self.template_folder = template_folder if template_folder is not None else get_templates_path()
 
         # state storage
         self.instruments = instruments
-        self.console = Console()
-        self.session = PromptSession()
         self.multiplex = False
         self.is_library = is_library
         self.available_sequences = {}     # All loaded sequences
@@ -97,179 +89,25 @@ class ggDesigner:
 
 
     def load_and_get_sequences(self, directory: Path) -> None:
-        """"Loads seqeunces from a directory and store them for assembly. 
-        
-        Args: 
-            directory: Path to a directory containing fasta files containing DNA components 
+        """"Loads seqeunces from a directory and store them for assembly.
+
+        Args:
+            directory: Path to a directory containing fasta files containing DNA components
             as fasta files
             """
         self.available_sequences = load_sequences(directory)
         self.gg_plasmids = Path(f"{directory}/plasmids")
         return self.available_sequences
 
-    def print_sequence_grid(self, sequences: dict, title: str = "Available Sequences"):
-        """Display available sequences in a formatted table"""
-        table = Table(title=title)
-        table.add_column("Name", style="cyan")
-        table.add_column("Length", justify="right", style="green")
-        table.add_column("Description", style="white")
-
-        for name, seq in sequences.items():
-            table.add_row(
-                name,
-                f"{len(seq)} bp",
-                seq.description[len(name):150+len(name)] + "..." if len(seq.description)-len(name) > 149 else seq.description[len(name):]
-            )
-
-        self.console.print(table)
-
-    def get_assembly_order(self, sequences: Dict[str, SeqRecord]) -> List[list[str]]:
-        """Get assembly order from user with autocomplete and mutliplex support 
-
-        prompts the user to enter sequences for assembly with autocomplete. 
-        Supports multiplex assemblies using '/' syntax to select multiple components 
-        in a given position, or /allx to select all parts of a give type x. 
-        
-        Args: 
-            sequences: Dictionary mapping sequence names to SeqRecord objects 
-
-        Returns: 
-            List[list[str]]: list of assemblies where each assembly is a list of sequence
-                            names. For single assemblies returns [[seq1,seq2 ...]]
-                            For multiplex assemblies returns [[seq1, seq2a,..], [seq1, seq2b...]]
-        Raises: 
-            click.Abort: if user cancels the operation
-            ValueError If no valid sequences are available
-
-        Examples:
-        Single assembly: "promoter_1 gene_1 terminator_1" -> [["promoter_1", "gene_1", "terminator_1"]]
-        Multiplex: "promoter_1 gene_1/gene_2 terminator_1" -> [["promoter_1", "gene_1", "terminator_1"], 
-                                                               ["promoter_1", "gene_2", "terminator_1"]]
-        All parts: "promoter_1 /all3 terminator_1" -> Multiple assemblies with type 3 parts
-        """
-        if not sequences:
-            raise ValueError("No sequences available for assembly")
-
-        sequence_completer = WordCompleter(sequences.keys(), ignore_case=True)
-
-        while True:
-            try:
-                self.console.print("\n[blue]Enter sequences to assemble (space-separated)[/blue]")
-                self.console.print("[dim]Use TAB for autocompletion[/dim]")
-                self.console.print("[dim]Remember that golden gate parts need to be assembled in order[/dim]")
-                self.console.print("[blue]Separate components with / to multiplex, use /all[red]X[/red] to select all parts of type [red]x[/red]")
-
-                user_input = self.session.prompt(
-                    "Sequences: ",
-                    completer=sequence_completer
-                )
-
-                selected = user_input.split()
-                if not selected:
-                    self.console.print("[yellow]No sequences selected[/yellow]")
-                    continue
-
-                #validate selections before processing
-                invalid_selections = []
-                for selection in selected:
-                    if selection.startswith("/all"):
-                        part_type = selection[4:].strip()
-                        matching_parts = [name for name in sequences.keys() if name.split("_")[0] == part_type]
-                        if not matching_parts:
-                            invalid_selections.append(f"{selection} (no parts found with type '{part_type}')")
-
-                    elif "/" in selection:
-                        part_names = selection.split('/')
-                        for part_name in part_names:
-                            if part_name not in sequences:
-                                invalid_selections.append(f"{part_name} (from multplex selection '{selection})")
-
-                    else:
-                        if selection not in sequences:
-                            invalid_selections.append(selection)
-
-                #send user back to select if there are invalid entries
-                if invalid_selections:
-                    self.console.print(f"[red]Invalid selection(s): {','.join(invalid_selections)}[/red]")
-                    continue
-
-                # Process valid selections
-                assemblies = [[]]
-                for selection in selected:
-
-                    #if the user has input /allx create new assemblies for each part of type x
-                    if selection.startswith("/all"):
-                        self.multiplex = True # flag that this is now a multiplex assembly
-                        part_type = selection[4:].strip() #part name should follow /all directly
-
-                        multiplex_part_names = []
-                        for part in sequences.keys():
-                            if part.split("_")[0] == part_type:
-                                multiplex_part_names.append(part)
-
-                        print(f"{len(multiplex_part_names)} type {part_type} parts for multiplexing")
-
-                        #validate that the part name exists in the library
-                        if not multiplex_part_names:
-                            self.console.print(f"[red]No parts found with type {part_type}. Available types: {set(p.split('_')[0] for p in sequences.keys())}[/red]")
-
-                        #create new assemblies each with one of the multiplex parts appended
-                        new_assemblies = []
-                        for assembly in assemblies:
-                            for part in multiplex_part_names:
-                                new_assemblies.append(assembly + [part])
-                        assemblies = new_assemblies
-
-
-
-                    elif "/" in selection:
-                        self.multiplex = True
-                        part_type = selection.split("_")[0]
-
-                        part_names = selection.split("/")
-                        print(f"{len(part_names)} type {part_type} parts for multiplexing")
-
-                        new_assemblies = []
-                        for assembly in assemblies:
-                            for part in part_names:
-                                new_assemblies.append(assembly + [part])
-                        assemblies = new_assemblies
-                        # print(f"{len(assemblies)} multiplex assemblies with type {part_type} parts")
-
-
-                    else: #only one option selected, append to all assemblies in place
-                        for assembly in assemblies:
-                            assembly.append(selection)
-
-
-                #provide some feed back on how many constructs have been desinged in the combinatorial selection
-                if self.multiplex:
-                    print(f"{len(assemblies)} constructs for assembly")
-                else:
-                    print("one construct for assembly")
-
-                self.assemblies_names = assemblies
-                return assemblies
-
-            except Exception as e:
-                print(f"Error: {str(e)}")
-                raise click.Abort()
-
-            except KeyboardInterrupt:
-                if confirm("\nDo you want to exit?"):
-                    raise click.Abort()
-                continue
-
-
-    def get_plasmid_names(self) -> List[str]:
+    def get_plasmid_names(self) -> list[str]:
         """Map sequences to plasmids containing those sequences.
-        
+
         Searches for plasmids in both public and private plasmid directories.
         Sets self.plasmid_names for dnacauldron assembly.
-        
-        Returns: 
-            List[str] of plasmid filenames (not paths) for dnacauldron assembly 
-        Raises: 
+
+        Returns:
+            List[str] of plasmid filenames (not paths) for dnacauldron assembly
+        Raises:
             ValueError: If no assemblies have been selected
             FileNotFoundError: If no plasmid folder exists
             RuntimeError: If parts cannot be mapped to plasmids
@@ -281,15 +119,14 @@ class ggDesigner:
             raise ValueError("No assembly sequence available. Please run get_seq_records first.")
 
         # Check both public and private plasmid directories
-        from pathlib import Path
         public_plasmids = self.gg_plasmids
 
-        # Construct private plasmids path
+        # Construct private plasmids path (if path is within data directory)
         try:
-            relative_path = public_plasmids.relative_to("data")
-            private_plasmids = Path("data/private") / relative_path
+            private_plasmids = get_private_equivalent(public_plasmids)
         except ValueError:
-            private_plasmids = Path("data/private") / public_plasmids.name
+            # Path is not within data directory, so no private equivalent exists
+            private_plasmids = None
 
         # Collect plasmid files from both locations
         plasmid_files = []
@@ -300,13 +137,16 @@ class ggDesigner:
             plasmid_files.extend(list(public_plasmids.glob('*.gb')))
             plasmid_files.extend(list(public_plasmids.glob('*.gbk')))
 
-        if private_plasmids.exists():
+        if private_plasmids and private_plasmids.exists():
             found_any_dir = True
             plasmid_files.extend(list(private_plasmids.glob('*.gb')))
             plasmid_files.extend(list(private_plasmids.glob('*.gbk')))
 
         if not found_any_dir:
-            raise FileNotFoundError(f"Plasmid folder not found in {public_plasmids} or {private_plasmids}")
+            if private_plasmids:
+                raise FileNotFoundError(f"Plasmid folder not found in {public_plasmids} or {private_plasmids}")
+            else:
+                raise FileNotFoundError(f"Plasmid folder not found in {public_plasmids}")
 
         # Collect all the unique sequence names from all assemblies
         all_part_names = set()
@@ -321,8 +161,8 @@ class ggDesigner:
         # Search plasmid files to find which contain each part
         part_to_plasmid = {}
 
-        self.console.print(f"[blue]Searching {len(plasmid_files)} plasmid files for part sequences...[/blue]")
-        
+        logger.info(f"Searching {len(plasmid_files)} plasmid files for part sequences...")
+
         for plasmid_file in plasmid_files:
             try:
                 # Use parse to handle multiple records in a file
@@ -340,14 +180,14 @@ class ggDesigner:
                                 break  # Found the part, move to next part
 
             except Exception as e:
-                self.console.print(f"[yellow]Warning could not read {plasmid_file}: {str(e)}[/yellow]")
+                logger.warning(f"Could not read {plasmid_file}: {str(e)}")
                 continue
         
         # check for missing mappings
         missing_parts = all_part_names - set(part_to_plasmid.keys())
 
         if missing_parts:
-            self.console.print(f"[red]Could not find plasmid containing {', '.join(missing_parts)}[/red]")
+            logger.error(f"Could not find plasmid containing: {', '.join(missing_parts)}")
             raise RuntimeError(f"Parts not found in any plasmids: {missing_parts}")
         
 
@@ -376,16 +216,16 @@ class ggDesigner:
 
     def gg_assembly(self, assembly_name: str) -> dc.Type2sRestrictionAssembly:
         """Pass plasmids to dnacauldron for Golden Gate assembly simulation.
-        
+
         Loads plasmids from both public and private directories to create the repository.
         Sets self.assembly_sim = AssemblySimulation object.
-        
-        Args: 
+
+        Args:
             assembly_name: name for plasmids in output
 
-        Raises: 
-            ValueError: If no plasmids have been set 
-            ValueError: If no assemblies have been selected 
+        Raises:
+            ValueError: If no plasmids have been set
+            ValueError: If no assemblies have been selected
             RuntimeError: If assembly simulation fails or produces unexpected results
         """
         from pathlib import Path
@@ -451,40 +291,34 @@ class ggDesigner:
 
         # Check for errors
         if simulation.errors:
-            self.console.print("[red]Assembly errors detected:[/red]")
             for error in simulation.errors:
-                self.console.print(f"[red] - {error}[/red]")
+                logger.error(f"Assembly error: {error}")
 
         # Check for warnings
         if simulation.warnings:
-            self.console.print("[yellow]Assembly warnings:[/yellow]")
             for warning in simulation.warnings:
-                self.console.print(f"[yellow] - {warning}[/yellow]")
+                logger.warning(f"Assembly warning: {warning}")
 
         # Check number of constructs produced
         expected_constructs = len(self.assemblies_names)
         actual_constructs = len(simulation.construct_records)
         if actual_constructs != expected_constructs:
-            self.console.print(f"[yellow]Expected {expected_constructs}, got {actual_constructs}[/yellow]")
+            logger.warning(f"Expected {expected_constructs} constructs, got {actual_constructs}")
             mixes = list(record["parts"] for record in simulation.compute_all_construct_data_dicts())
-            if len(mixes)>0:
-                self.console.print("Mixtures found:")
-                self.console.print(f"used {assembly.enzyme}")
-                for mix in mixes:
-                    self.console.print(mix)
-
-        elif actual_constructs == expected_constructs:
-            self.console.print(f"generated {expected_constructs} constructs as expected using [blue]{assembly.enzyme}[/blue]")
+            if len(mixes) > 0:
+                logger.warning(f"Mixtures found (enzyme: {assembly.enzyme}): {mixes}")
+        else:
+            logger.info(f"Generated {expected_constructs} constructs as expected using {assembly.enzyme}")
 
     def gg_save_output(self, output_path: str) -> None:
         """Saves the output of the assembly function, creating a new plasmid output file
-        single assemblies, or a folder full of .gb files (no images) for multiplex assemblies. 
-        Takes output from simulation object to write a full report. also uses the user input 
-        from output_prefix to overwirte assembly names with input1, input2 etc. 
-        Outputs a graphical representations of multiplex assemblies. 
+        single assemblies, or a folder full of .gb files (no images) for multiplex assemblies.
+        Takes output from simulation object to write a full report. also uses the user input
+        from output_prefix to overwirte assembly names with input1, input2 etc.
+        Outputs a graphical representations of multiplex assemblies.
 
-        Args: 
-            Output_prefix: path to output folder, 
+        Args:
+            Output_prefix: path to output folder,
 
 
 
@@ -495,13 +329,14 @@ class ggDesigner:
 
 
 
-    def gg_instructions(self, output_path: str, assembly_name: str):
-        """Generates human readable or machine specific instructions 
-        this will just boil down to a table of what plasmids to include and where they are
-        I will save this in the appropriate folder - but I'd like to make it possible to 
-        run a gg_lvl1 with an option to start here from an existing folder full of plasmids 
-        to be assembled - e.g. if you realize you want to use a different machine.
-        this might actaully be clearer as a separate command simlar to batch.
+    def gg_instructions(self, output_path: str, assembly_name: str, liquid_handler: str = "human"):
+        """Generate human-readable or machine-specific assembly instructions.
+
+        Args:
+            output_path: Path to output folder.
+            assembly_name: Name prefix for output files.
+            liquid_handler: Liquid handler to generate instructions for.
+                One of 'janus', 'hamilton', 'epmotion', or 'human' (default: 'human').
         """
         all_construct_data = self.assembly_sim.compute_all_construct_data_dicts()
         for i, dict in enumerate(all_construct_data):
@@ -528,14 +363,7 @@ class ggDesigner:
         if self.is_library:
             instructions_dataframe = instructions_dataframe.drop_duplicates(subset=["wells"]).reset_index(drop=True)
 
-
-        # User selects liquid handler and coresponding instructions are written
-        self.console.print("Available liquid handlers")
-        for i, instrument in enumerate(self.instruments):
-            self.console.print(f"{i+1}: {instrument}")
-
-        completer = WordCompleter(self.instruments, ignore_case=True)
-        liquid_handler = self.session.prompt("Select a liquid handler for instruction formating: ", completer=completer).strip().lower()
+        liquid_handler = liquid_handler.strip().lower()
 
         if liquid_handler == "janus" or liquid_handler == "hamilton":
             # instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
@@ -546,7 +374,7 @@ class ggDesigner:
             janus_instructions['destination_plate'] = 'assembly plate' # need in increment this up by one ever 96 assemblies (will this ever happen? It's so much material!)
             janus_instructions = janus_instructions[['construct_id', 'asperate_plate', 'asperate_well', 'destination_plate', 'destination_well', 'transfer_volume']]
             janus_instructions.to_csv(f"{output_path}/{assembly_name}_worklist.csv", index = False)
-            self.console.print(f"Saved output to {output_path}\\{assembly_name}_worklist.csv")
+            logger.info(f"Saved worklist to {output_path}/{assembly_name}_worklist.csv")
 
             # For single head machines you can use these columns to save tips. Different, v. complex implementation required for multi see CRVP paper by Wu et al 2025
             # instructions_dataframe = instructions_dataframe.sort_values(by = ['asperate_plate','asperate_well'])
@@ -592,7 +420,7 @@ class ggDesigner:
                 writer = csv.writer(f)
                 writer.writerows(header)
                 writer.writerows(epmotion_instructions.values)
-            self.console.print(f"Saved epMotion instructions to {output_path} as {assembly_name}_epmotion_instructions.csv")
+            logger.info(f"Saved epMotion instructions to {output_path}/{assembly_name}_epmotion_instructions.csv")
 
         elif liquid_handler == 'human':
             volume_per_part = 1  # µL
@@ -622,9 +450,9 @@ class ggDesigner:
                     parts_list = first_row['parts']  # Get the full parts list
                     for idx, (_, row) in enumerate(group.iterrows()):
                         plate, well = row['wells']
-                        if plate == None:
+                        if plate is None:
                             plate = "not found"
-                        if well == None:
+                        if well is None:
                             well = "??"
                         part_name = parts_list[idx] if idx < len(parts_list) else 'part'
 
@@ -638,34 +466,33 @@ class ggDesigner:
 
                     f.write('\n[ ] Assembly complete\n')
                     f.write('\n\n')
-                self.console.print(f"Saved instructions to {output_path} as {assembly_name}_human instructions.txt")
+                logger.info(f"Saved instructions to {output_path}/{assembly_name}_human_instructions.txt")
 
 
 
 
-    def _get_template_position(self, template_name: str) -> Tuple[Optional[str], Optional[str]]:
+    def _get_template_position(self, template_name: str) -> tuple[Optional[str], Optional[str]]:
         """Find the plate and well position for a given template.
-        
+
         First checks if the template is a contig/chromosome in the genome mapping file,
         then checks the template plates Excel file for individual templates.
         Searches both public and private template directories.
-        
+
         Args:
             template_name: Name of the template or genome contig to locate
-            
+
         Returns:
             Tuple containing:
                 - Plate name/barcode (or None if not found)
                 - Well position (or None if not found)
                 Format of well position is standard 96-well notation (e.g., 'A1', 'H12')
-                
+
         Raises:
             FileNotFoundError: If required mapping files aren't found
         """
-        from pathlib import Path
 
         # Construct private template directory path
-        private_template_folder = Path("data/private/templates")
+        private_template_folder = get_templates_path(private=True)
 
         # Check both public and private genome mapping files
         for search_dir in [self.template_folder, private_template_folder]:
@@ -684,7 +511,7 @@ class ggDesigner:
                             return row['Plate'], row['Well_Position']
 
                 except Exception as e:
-                    self.console.print(f"[yellow]Warning: Error reading genome mapping file: {str(e)}[/yellow]")
+                    logger.warning(f"Error reading genome mapping file: {str(e)}")
 
         # If not found in genome mapping, check template plates Excel files
         for search_dir in [self.template_folder, private_template_folder]:
@@ -710,22 +537,21 @@ class ggDesigner:
                                 return sheet, well
 
             except Exception as e:
-                self.console.print(f"[yellow]Warning: Error reading template plate map: {str(e)}[/yellow]")
+                logger.warning(f"Error reading template plate map: {str(e)}")
 
-        # Template not found in either public or private locations
-        self.console.print(f"[yellow]Warning: Template {template_name} not found in any mapping files[/yellow]")
+        logger.warning(f"Template {template_name} not found in any mapping files")
         return None, None
 
 
     def find_templates(self, template_folder: Path) -> None:
         """Find template matches for each assembly component.
-        
+
         Uses template functions from sequence_utils to identify potential
         templates for each sequence and rationalize the selections.
-        
+
         Args:
             template_folder: Path to folder containing template files
-            
+
         Raises:
             ValueError: If no sequences have been selected for assembly
         """
