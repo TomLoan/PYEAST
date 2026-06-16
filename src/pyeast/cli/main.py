@@ -1543,8 +1543,20 @@ def gg(library):
         raise click.Abort()
 
 @cli.command()
-@click.option("--model", default="claude-sonnet-4-6", show_default=True, help="Claude model to use.")
-def agent(model: str) -> None:
+@click.option(
+    "--provider",
+    type=click.Choice(["anthropic", "ollama"]),
+    default="anthropic",
+    show_default=True,
+    help="LLM backend to use.",
+)
+@click.option(
+    "--model",
+    default=None,
+    help="Model to use. Defaults to claude-sonnet-4-6 for --provider anthropic; "
+    "required for --provider ollama.",
+)
+def agent(provider: str, model: str | None) -> None:
     """Start an interactive LLM-powered experiment design session.
 
     \b
@@ -1553,10 +1565,13 @@ def agent(model: str) -> None:
     - design TAR cloning or gene deletion experiments
     - explain results and next wet-lab steps
 
-    Requires ANTHROPIC_API_KEY to be set (see .env.example).
+    With --provider anthropic (default), requires ANTHROPIC_API_KEY to be set
+    (see .env.example). With --provider ollama, requires a locally running
+    Ollama server (ollama serve) with a tool-calling-capable model pulled,
+    e.g. `ollama pull qwen2.5`.
     """
     from pyeast.agent import run_agent
-    run_agent(model=model)
+    run_agent(model=model, provider=provider)
 
 
 if __name__ == '__main__':
