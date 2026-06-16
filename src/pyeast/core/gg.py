@@ -29,6 +29,7 @@ Level 1 golden gate assemblies using the yeast Moclo standard from Lee et al 201
 
 
 import csv
+import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -36,7 +37,7 @@ import click
 import dnacauldron as dc
 import openpyxl
 import pandas as pd
-from Bio import SeqIO
+from Bio import BiopythonDeprecationWarning, SeqIO
 from Bio.SeqRecord import SeqRecord
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter
@@ -321,7 +322,7 @@ class ggDesigner:
         part_to_plasmid = {}
 
         self.console.print(f"[blue]Searching {len(plasmid_files)} plasmid files for part sequences...[/blue]")
-
+        
         for plasmid_file in plasmid_files:
             try:
                 # Use parse to handle multiple records in a file
@@ -341,17 +342,18 @@ class ggDesigner:
             except Exception as e:
                 self.console.print(f"[yellow]Warning could not read {plasmid_file}: {str(e)}[/yellow]")
                 continue
-
+        
         # check for missing mappings
         missing_parts = all_part_names - set(part_to_plasmid.keys())
 
         if missing_parts:
             self.console.print(f"[red]Could not find plasmid containing {', '.join(missing_parts)}[/red]")
             raise RuntimeError(f"Parts not found in any plasmids: {missing_parts}")
+        
 
         # Get unique plasmid names for assembly
         required_plasmids = list(set(part_to_plasmid.values()))
-
+        
         # Store results
         self.part_to_plasmid_mapping = part_to_plasmid
         self.plasmid_names = required_plasmids
@@ -387,7 +389,7 @@ class ggDesigner:
             RuntimeError: If assembly simulation fails or produces unexpected results
         """
         from pathlib import Path
-
+        
 
         # Construct both public and private plasmid paths
         public_plasmids = self.gg_plasmids
@@ -397,26 +399,36 @@ class ggDesigner:
             private_plasmids = Path("data/private") / relative_path
         except ValueError:
             private_plasmids = Path("data/private") / public_plasmids.name
-
+        
         # Create repository and load records from both locations
         repository = dc.SequenceRepository()
 
-        # Load from public directory if it exists
-        if public_plasmids.exists():
-            repository.import_records(
-                folder=str(public_plasmids),
-                use_file_names_as_ids=False
+        # Suppress BioPython FASTA comment deprecation warning
+        # This warning is triggered by dnacauldron's use of BioPython's FASTA parser
+        # with deprecated defaults, even when FASTA files don't contain comments
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                'ignore',
+                category=BiopythonDeprecationWarning
             )
 
-        # Load from private directory if it exists
-        if private_plasmids.exists():
-            repository.import_records(
-                folder=str(private_plasmids),
-                use_file_names_as_ids=False
-            )
+            # Load from public directory if it exists
+            if public_plasmids.exists():
+                repository.import_records(
+                    folder=str(public_plasmids),
+                    use_file_names_as_ids=False
+                )
+
+            # Load from private directory if it exists
+            if private_plasmids.exists():
+                repository.import_records(
+                    folder=str(private_plasmids),
+                    use_file_names_as_ids=False
+                )
 
         self.repository = repository
-
+        
+        
         # Create Type 2 restriction assembly with the required plasmids
         assembly = dc.Type2sRestrictionAssembly(
             parts=self.plasmid_names,
@@ -425,11 +437,12 @@ class ggDesigner:
             max_constructs=len(self.assemblies_names) + 1
         )
         self.assembly = assembly
-
+        
         simulation = assembly.simulate(sequence_repository=repository)
         self.assembly_sim = simulation
 
         self._validate_assembly_results(simulation, assembly)
+        
         return simulation
 
 
