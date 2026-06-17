@@ -4,7 +4,7 @@ import warnings
 
 from dotenv import load_dotenv
 
-from pyeast.agent.providers import AnthropicProvider, OllamaProvider
+from pyeast.agent.providers import AnthropicProvider, OllamaProvider, OpenAIProvider
 from pyeast.agent.tools import TOOL_SCHEMAS, dispatch_tool
 
 _SYSTEM_PROMPT = """\
@@ -135,7 +135,7 @@ ask for its sequence before attempting any design.
 """
 
 
-def run_agent(model: str | None = None, provider: str = "anthropic") -> None:
+def run_agent(model: str | None = None, provider: str = "anthropic", base_url: str | None = None) -> None:
     """Start an interactive PYEAST agent session."""
     load_dotenv()
 
@@ -143,8 +143,10 @@ def run_agent(model: str | None = None, provider: str = "anthropic") -> None:
         llm = AnthropicProvider(model=model or "claude-sonnet-4-6")
     elif provider == "ollama":
         llm = OllamaProvider(model=model)
+    elif provider == "openai":
+        llm = OpenAIProvider(model=model, base_url=base_url)
     else:
-        print(f"Error: unknown provider '{provider}'. Use 'anthropic' or 'ollama'.")
+        print(f"Error: unknown provider '{provider}'. Use 'anthropic', 'ollama', or 'openai'.")
         return
 
     print(

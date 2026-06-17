@@ -185,3 +185,160 @@ class OllamaProvider(LLMProvider):
 
         stop_reason = "tool_use" if tool_calls else "end_turn"
         return {"content": content_blocks, "stop_reason": stop_reason}
+
+class OpenAIProvider(LLMProvider):
+    def __init__(self, model: str | None, base_url: str | None = None):
+        if not model:
+            print(
+                "Error: --model is required for --provider openai.\n"
+                "Pass the identifier of the model loaded in your server.\n"
+                "In LM Studio this is the model key shown in the Developer tab\n"
+                "(e.g. 'qwen2.5-7b-instruct')."
+            )
+            sys.exit(1)
+
+        self.model = model
+        # Explicit --base-url flag takes precedence over env var, then hardcoded default.
+        self.base_url = (
+            base_url or os.environ.get("OPENAI_BASE_URL", "http://localhost:1234/v1")
+        ).rstrip("/")
+        # LM Studio ignores the key, but the header is harmless and other
+        # OpenAI-compatible servers may require it.
+        self.api_key = os.environ.get("OPENAI_API_KEY", "lm-studio")
+ 
+    @staticmethod
+    def _to_openai_tools(tools: list) -> list:
+        # Same wrapping Ollama uses; this part of the format is shared.
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parameters": tool["input_schema"],
+                },
+            }
+            for tool in tools
+        ]
+ 
+    @staticmethod
+    def _result_to_text(content) -> str:
+        # A tool_result's content may be a plain string or a list of blocks.
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = []
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    parts.append(block["text"])
+                else:
+                    parts.append(str(block))
+            return "\n".join(parts)
+        return str(content)
+ 
+    @classmethod
+    def _to_openai_messages(cls, messages: list, system_prompt: str) -> list:
+        openai_messages = [{"role": "system", "content": system_prompt}]
+ 
+        for message in messages:
+            role = message["role"]
+            content = message["content"]
+ 
+            if isinstance(content, str):
+                openai_messages.append({"role": role, "content": content})
+                continue
+ 
+            text_parts = []
+            tool_calls = []
+            for block in content:
+                btype = block["type"]
+                if btype == "text":
+                    text_parts.append(block["text"])
+                elif btype == "tool_use":
+                    tool_calls.append({
+                        "id": block["id"],            # echo the model's id back
+                        "type": "function",
+                        "function": {
+                            "name": block["name"],
+                            # OpenAI wants arguments as a JSON *string*.
+                            "arguments": json.dumps(block["input"]),
+                        },
+                    })
+                elif btype == "tool_result":
+                    openai_messages.append({
+                        "role": "tool",
+                        # must reference the call this result answers
+                        "tool_call_id": block["tool_use_id"],
+                        "content": cls._result_to_text(block["content"]),
+                    })
+ 
+            if text_parts or tool_calls:
+                assistant_message = {
+                    "role": role,
+                    "content": "\n".join(text_parts),
+                }
+                if tool_calls:
+                    assistant_message["tool_calls"] = tool_calls
+                openai_messages.append(assistant_message)
+ 
+        return openai_messages
+ 
+    def send(self, messages: list, system_prompt: str, tools: list) -> dict:
+        payload = {
+            "model": self.model,
+            "messages": self._to_openai_messages(messages, system_prompt),
+            "tools": self._to_openai_tools(tools),
+            "stream": False,
+        }
+ 
+        request = urllib.request.Request(
+            f"{self.base_url}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            },
+            method="POST",
+        )
+ 
+        try:
+            with urllib.request.urlopen(request, timeout=300) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.URLError as e:
+            print(
+                f"Error: could not reach the server at {self.base_url} ({e}).\n"
+                "In LM Studio, open the Developer tab, click Start Server, and\n"
+                "make sure a model is loaded into memory."
+            )
+            sys.exit(1)
+ 
+        message = body["choices"][0]["message"]
+ 
+        text = message.get("content") or ""
+        if text:
+            print(text, end="", flush=True)
+ 
+        content_blocks = []
+        if text:
+            content_blocks.append({"type": "text", "text": text})
+ 
+        for call in message.get("tool_calls") or []:
+            function = call["function"]
+            arguments = function.get("arguments", "{}")
+            # OpenAI returns arguments as a JSON string; be defensive in case a
+            # given server hands back a dict already.
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments) if arguments else {}
+                except json.JSONDecodeError:
+                    arguments = {}
+            content_blocks.append({
+                "type": "tool_use",
+                # keep the server's id so the eventual tool_result can match it
+                "id": call.get("id") or f"call_{uuid.uuid4().hex[:24]}",
+                "name": function["name"],
+                "input": arguments,
+            })
+ 
+        stop_reason = "tool_use" if (message.get("tool_calls")) else "end_turn"
+        return {"content": content_blocks, "stop_reason": stop_reason}
