@@ -50,78 +50,15 @@ def load_expected_assembly(test_case_dir, assembly_type='tar'):
 
 @pytest.fixture
 def mock_console_interaction():
-    """Mock prompt_toolkit components to avoid console interaction during tests"""
-    with patch('pyeast.core.tar.PromptSession') as mock_tar_session, \
-         patch('pyeast.core.tar.Console') as mock_tar_console, \
-         patch('pyeast.core.tar.confirm') as mock_tar_confirm, \
-         patch('pyeast.core.integration.PromptSession') as mock_int_session, \
-         patch('pyeast.core.integration.Console') as mock_int_console, \
-         patch('pyeast.core.deletion.PromptSession') as mock_del_session, \
-         patch('pyeast.core.deletion.Console') as mock_del_console, \
-         patch('pyeast.core.replace.PromptSession') as mock_rep_session, \
-         patch('pyeast.core.replace.Console') as mock_rep_console, \
-         patch('pyeast.core.gg.PromptSession') as mock_gg_session, \
-         patch('pyeast.core.gg.Console') as mock_gg_console, \
-         patch('click.confirm') as mock_click_confirm:
+    """Mock click.confirm to avoid interactive prompts during tests.
 
-        # Mock the session to avoid prompt_toolkit calls
-        mock_tar_session_instance = Mock()
-        mock_tar_session.return_value = mock_tar_session_instance
-
-        # Mock console to avoid rich output issues
-        mock_tar_console_instance = Mock()
-        mock_tar_console.return_value = mock_tar_console_instance
-
-        # Mock confirm to always return True
-        mock_tar_confirm.return_value = True
-
-        # Mock the Integration session
-        mock_int_session_instance = Mock()
-        mock_int_session.return_value = mock_int_session_instance
-
-        # Mock Integration console
-        mock_int_console_instance = Mock()
-        mock_int_console.return_value = mock_int_console_instance
-
-        # Mock the Deletion session
-        mock_del_session_instance = Mock()
-        mock_del_session.return_value = mock_del_session_instance
-
-        # Mock Deletion console
-        mock_del_console_instance = Mock()
-        mock_del_console.return_value = mock_del_console_instance
-
-        # Mock the Replace session
-        mock_rep_session_instance = Mock()
-        mock_rep_session.return_value = mock_rep_session_instance
-
-        # Mock Replace console
-        mock_rep_console_instance = Mock()
-        mock_rep_console.return_value = mock_rep_console_instance
-
-        # Mock the GG session
-        mock_gg_session_instance = Mock()
-        mock_gg_session.return_value = mock_gg_session_instance
-
-        # Mock GG console
-        mock_gg_console_instance = Mock()
-        mock_gg_console.return_value = mock_gg_console_instance
-
-        # Mock click.confirm to always return True
+    TAR, Integration, Deletion, Replace, Batch, and GG designers no longer use
+    interactive components directly - those live in cli/main.py.
+    """
+    with patch('click.confirm') as mock_click_confirm:
         mock_click_confirm.return_value = True
 
         yield {
-            'tar_session': mock_tar_session_instance,
-            'tar_console': mock_tar_console_instance,
-            'tar_confirm': mock_tar_confirm,
-            'int_session': mock_int_session_instance,
-            'int_console': mock_int_console_instance,
-            'del_session': mock_del_session_instance,
-            'del_console': mock_del_console_instance,
-            'rep_session': mock_rep_session_instance,
-            'rep_console': mock_rep_console_instance,
-            'gg_session': mock_gg_session_instance,
-            'gg_console': mock_gg_console_instance,
             'click_confirm': mock_click_confirm
         }
 

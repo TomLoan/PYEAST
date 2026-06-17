@@ -25,19 +25,51 @@ Transformation Assisted Recombinaiton (TAR) toolkit for plasmid assembly in S. c
 
 
 
+from dataclasses import dataclass, field
 from pathlib import Path
 
-import click
+from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.shortcuts import confirm
-from rich.console import Console
-from rich.table import Table
 
 from pyeast.utils.primer_utils import design_circular_primers, get_primer_locations, rationalize_primers
 from pyeast.utils.sequence_utils import assemble_parts_circular, get_templates, load_sequences, rationalize_templates, write_circular_instructions
+
+
+@dataclass
+class TARResult:
+    """Result of a TAR cloning design run."""
+    name: str
+    assembly: SeqRecord
+    primers: dict
+    instructions: list
+    missing_primers: dict = field(default_factory=dict)
+
+    def save(self, output_prefix: Path) -> None:
+        """Save GenBank file and TSV outputs.
+
+        Args:
+            output_prefix: Path stem for output files, e.g. Path("output/my_plasmid/my_plasmid").
+                Files are written as <output_prefix>.gb, <output_prefix>_instructions.tsv, etc.
+        """
+        output_prefix = Path(output_prefix)
+        SeqIO.write(self.assembly, f"{output_prefix}.gb", "genbank")
+
+        with open(f"{output_prefix}_all_primers.tsv", "w") as f:
+            f.write("Name\tSequence\n")
+            for name, seq in self.primers.items():
+                f.write(f"{name}\t{seq}\n")
+
+        if self.missing_primers:
+            with open(f"{output_prefix}_missing_primers.tsv", "w") as f:
+                f.write("Name\tSequence\n")
+                for name, info in self.missing_primers.items():
+                    f.write(f"{name}\t{info[0]['sequence']}\n")
+
+        with open(f"{output_prefix}_instructions.tsv", "w") as f:
+            f.write("Part\tF_Plate\tF_Name\tF_Well\tR_Plate\tR_Name\tR_Well\tTemplate\tSize\n")
+            for row in self.instructions:
+                f.write("\t".join(map(str, row)) + "\n")
 
 
 class TARDesigner:
@@ -58,8 +90,6 @@ class TARDesigner:
 
         self.homology_length = homology_length
         self.annealing_temp = annealing_temp
-        self.console = Console()
-        self.session = PromptSession()
 
         self.available_sequences = {}     # All loaded sequences
         self.assembly_sequences = []      # Sequences in assembly order
@@ -81,88 +111,6 @@ class TARDesigner:
             """
         self.available_sequences = load_sequences(directory)
         return self.available_sequences
-
-    def get_assembly_order(self, sequences: dict[str, SeqRecord]) -> list[str]:
-        """Get assembly order from user with autocomplete"""
-        sequence_completer = WordCompleter(sequences.keys(), ignore_case=True)
-
-        while True:
-            try:
-                self.console.print("\n[blue]Enter sequences to assemble (space-separated)[/blue]")
-                self.console.print("[dim]Use TAB for autocompletion[/dim]")
-
-                user_input = self.session.prompt(
-                    "Sequences: ",
-                    completer=sequence_completer
-                )
-
-                selected = user_input.split()
-                if not selected:
-                    self.console.prinpt("[yellow]No sequences selected[/yellow]")
-                    continue
-
-                # Validate selections
-                invalid = [name for name in selected if name not in sequences]
-                if invalid:
-                    self.console.print(f"[red]Invalid sequence(s): {', '.join(invalid)}[/red]")
-                    continue
-
-                # Show selection and confirm
-                self.console.print("\n[green]Selected sequences:[/green]")
-                for i, name in enumerate(selected, 1):
-                    self.console.print(f"{i}. {name}")
-
-                if click.confirm("\nProceed with these sequences?"):
-                    return selected
-
-            except KeyboardInterrupt:
-                if confirm("\nDo you want to exit?"):
-                    return None
-                continue
-
-    def display_instructions(self, instructions: list[list[str]]):
-        """Display assembly instructions in a formatted table"""
-        table = Table(title="Assembly Instructions")
-        table.add_column("Part Name", style="bold cyan")
-        table.add_column("Fwd Primer", style="green")
-        table.add_column("Fwd Plate", style = "bold cyan")
-        table.add_column("Well", style="bold blue")
-        table.add_column("Rev Primer", style="green")
-        table.add_column("Rev Plate", style = "bold cyan")
-        table.add_column("Well", style="bold blue")
-        table.add_column("Template", style="magenta")
-        table.add_column("Size", justify="right")
-
-        for line in instructions:
-            table.add_row(
-                str(line[0]),  # Part name
-                str(line[2]),   # Fwd primer name
-                str(line[1] if line[1] != "N/A" else "[bold red]Not found[/bold red]"), # Fwd primer plate
-                str(line[3] if line[3] != "N/A" else "[bold red]Not found[/bold red]"),  # Fwdc well
-                str(line[5]),  # Rev primer name
-                str(line[4] if line[4] != "N/A" else "[bold red]Not found[/bold red]"),   # Rev primer Plate
-                str(line[6] if line[6] != "N/A" else "[bold red]Not found[/bold red]"),  # Rev well
-                str(line[7] if line[7] != "Not found" else "[bold red]Not found[/bold red]"), #Template
-                str(line[8])  # Amplicon Size
-            )
-
-        self.console.print(table)
-
-    def print_sequence_grid(self, sequences: dict, title: str = "Available Sequences"):
-        """Display available sequences in a formatted table"""
-        table = Table(title=title)
-        table.add_column("Name", style="cyan")
-        table.add_column("Length", justify="right", style="green")
-        table.add_column("Description", style="white")
-
-        for name, seq in sequences.items():
-            table.add_row(
-                name,
-                f"{len(seq)} bp",
-                seq.description[:150] + "..." if len(seq.description) > 149 else seq.description
-            )
-
-        self.console.print(table)
 
     def set_assembly_order(self, selected_names: list[str])-> None:
         """Set the assmebly order from user selected seqeunce names"""
@@ -307,3 +255,56 @@ class TARDesigner:
         )
 
         return self.final_assembled_plasmid
+
+    def design(
+        self,
+        library_path: Path,
+        assembly_order: list[str],
+        primer_folder: Path,
+        template_folder: Path,
+        name: str = "assembly",
+    ) -> TARResult:
+        """Design a TAR cloning experiment programmatically.
+
+        Runs the full design pipeline - load sequences, design primers, find templates,
+        rationalize selections, generate instructions, and assemble.
+
+        Args:
+            library_path: Path to the component library directory (FASTA files).
+            assembly_order: Ordered list of component names to assemble.
+            primer_folder: Path to primer plate library folder.
+            template_folder: Path to template folder.
+            name: Name for the assembled construct (default: "assembly").
+
+        Returns:
+            TARResult containing the assembled construct, primers, instructions,
+            and any missing primers. Call result.save(output_prefix) to write files.
+
+        Example:
+            designer = TARDesigner(homology_length=25)
+            result = designer.design(
+                library_path=Path("data/component_libraries/YeastToolKit"),
+                assembly_order=["part1", "part2", "part3"],
+                primer_folder=Path("data/primers"),
+                template_folder=Path("data/templates"),
+                name="my_plasmid",
+            )
+            result.save(Path("output/my_plasmid/my_plasmid"))
+        """
+        self.load_and_get_sequences(library_path)
+        self.set_assembly_order(assembly_order)
+        self.design_tar_primers()
+        self.check_primer_locations(primer_folder)
+        self.find_templates(template_folder)
+        self.rationalize_selections()
+        instructions = self.write_instructions()
+        assembly = self.create_assembly()
+        assembly.name = name
+
+        return TARResult(
+            name=name,
+            assembly=assembly,
+            primers=self.primers,
+            instructions=instructions,
+            missing_primers=self.missing_primers,
+        )

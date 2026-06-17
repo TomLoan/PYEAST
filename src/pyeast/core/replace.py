@@ -28,6 +28,7 @@ This module provides tools for designing pop-in/pop-out replacements in S. cerev
 
 
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -35,14 +36,34 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
-from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter
-from rich.console import Console
-from rich.table import Table
 
 from pyeast.utils.path_utils import get_component_libraries_path, get_templates_path
 from pyeast.utils.primer_utils import design_screening_primers
 from pyeast.utils.sequence_utils import load_sequences
+
+
+@dataclass
+class ReplaceResult:
+    """Result of a replacement cassette design run."""
+    name: str
+    cassette: SeqRecord
+    forward_primer: str
+    reverse_primer: str
+    product_sizes: dict
+    genome_location: tuple  # (chrom_id, start, end, orientation)
+
+    def save(self, output_prefix: Path) -> None:
+        """Save GenBank, FASTA, and screening primers TSV.
+
+        Args:
+            output_prefix: Path stem, e.g. Path("output/my_replace/my_replace").
+        """
+        output_prefix = Path(output_prefix)
+        SeqIO.write(self.cassette, f"{output_prefix}.gb", "genbank")
+        SeqIO.write(self.cassette, f"{output_prefix}.fasta", "fasta")
+        with open(f"{output_prefix}_screening_primers.tsv", "w") as f:
+            f.write(f"{self.name}_ScreenF\t{self.forward_primer}\n")
+            f.write(f"{self.name}_ScreenR\t{self.reverse_primer}")
 
 
 class ReplaceDesigner:
@@ -67,11 +88,8 @@ class ReplaceDesigner:
         self.downstream_homology_len = downstream_homology_len
         self.repeat_length = repeat_length
 
-        # Resolve default paths if not provided
         self.genome_file = genome_file if genome_file is not None else get_templates_path() / "BY4741_Toronto_2012.fsa"
         self.ura3_file = ura3_file if ura3_file is not None else get_component_libraries_path() / "Saccharomyces_cerevisiae" / "URA3.fasta"
-        self.console = Console()
-        self.session = PromptSession()
 
         # State storage
         self.target_sequence = None
@@ -106,61 +124,6 @@ class ReplaceDesigner:
 
         return None
 
-    def print_sequence_grid(self, sequences: dict[str, SeqRecord], title: str = "Available Sequences"):
-        """Display available sequences in a formatted table."""
-        table = Table(title=title)
-        table.add_column("Name", style="cyan")
-        table.add_column("Length", justify="right", style="green")
-        table.add_column("Description", style="white")
-
-        for name, seq in sequences.items():
-            table.add_row(
-                name,
-                f"{len(seq)} bp",
-                seq.description[:150] + "..." if len(seq.description) > 149 else seq.description
-            )
-
-        self.console.print(table)
-
-    def get_replacement_selection(self, components_dir: Path) -> Optional[SeqRecord]:
-        """Get user selection for replacement sequence from a library.
-
-        Args:
-            components_dir: Directory containing sequence libraries
-
-        Returns:
-            Selected sequence as SeqRecord or None if selection cancelled
-        """
-        # Load sequences
-        sequences = load_sequences(components_dir)
-        if not sequences:
-            self.console.print("[red]No sequences found in directory[/red]")
-            return None
-
-        # Display sequences and create completer
-        self.print_sequence_grid(sequences)
-        sequence_completer = WordCompleter(list(sequences.keys()), ignore_case=True)
-
-        while True:
-            try:
-                self.console.print("\n[blue]Select a sequence to insert:[/blue]")
-                user_input = self.session.prompt(
-                    "Sequence name: ",
-                    completer=sequence_completer
-                ).strip()
-
-                # Find matching sequence
-                matches = [seq for name, seq in sequences.items()
-                         if name.lower() == user_input.lower()]
-
-                if matches:
-                    return matches[0]
-                else:
-                    self.console.print("[red]Invalid sequence name[/red]")
-
-            except KeyboardInterrupt:
-                return None
-
     def extract_sequences(self, genome_seq: Seq, start: int, end: int, orientation: str) -> tuple[Seq, Seq, Seq]:
         """Extract required sequences based on marker position and orientation.
 
@@ -176,26 +139,22 @@ class ReplaceDesigner:
         if self.marker_position == "upstream" and orientation == "forward":
             upstream_homology = genome_seq[start :start + self.upstream_homology_len]
             downstream_homology = genome_seq[end:end + self.downstream_homology_len]
-            repeat = genome_seq[start - self.repeat_length:
-                            start]
+            repeat = genome_seq[start - self.repeat_length:start]
 
         elif self.marker_position == "upstream" and orientation == "reverse":
             upstream_homology = genome_seq[end-self.upstream_homology_len:end].reverse_complement()
             downstream_homology = genome_seq[start - self.downstream_homology_len:start].reverse_complement()
-            repeat = genome_seq[end :
-                            end + self.repeat_length].reverse_complement()
+            repeat = genome_seq[end:end + self.repeat_length].reverse_complement()
 
         elif self.marker_position == "downstream" and orientation == "forward":
             upstream_homology = genome_seq[start - self.upstream_homology_len:start]
             downstream_homology = genome_seq[end - self.downstream_homology_len : end]
-            repeat = genome_seq[end:
-                            end + self.repeat_length]
+            repeat = genome_seq[end:end + self.repeat_length]
 
         else:  # downstream and reverse
             upstream_homology = genome_seq[end:end + self.upstream_homology_len].reverse_complement()
             downstream_homology = genome_seq[start : start + self.downstream_homology_len].reverse_complement()
-            repeat = genome_seq[start - self.repeat_length:
-                            start].reverse_complement()
+            repeat = genome_seq[start - self.repeat_length:start].reverse_complement()
 
         return upstream_homology, downstream_homology, repeat
 
@@ -229,7 +188,6 @@ class ReplaceDesigner:
         upstream_homology, downstream_homology, repeat = self.extract_sequences(
             genome.seq, start, end, orientation
         )
-
 
         # Get URA3 marker
         ura3_marker = SeqIO.read(ura3_file, "fasta").seq
@@ -387,3 +345,73 @@ class ReplaceDesigner:
         self.product_sizes = product_sizes
 
         return forward_primer, reverse_primer, product_sizes
+
+    def design(
+        self,
+        target_sequence: str,
+        replacement_sequence: SeqRecord,
+        marker_position: str = "upstream",
+        name: str = "replacement_cassette",
+        genome_location: Optional[tuple] = None,
+    ) -> ReplaceResult:
+        """Design a replacement cassette programmatically.
+
+        Args:
+            target_sequence: DNA sequence to replace (A/T/G/C only).
+            replacement_sequence: SeqRecord to insert in place of the target.
+            marker_position: Where to place the URA3 marker - "upstream" or "downstream"
+                of the replacement sequence (default: "upstream").
+            name: Name for the output construct (default: "replacement_cassette").
+            genome_location: Optional pre-computed (chrom_id, start, end, orientation) tuple.
+                If provided, skips the genome search step (useful when displaying
+                the location interactively before committing to the design).
+
+        Returns:
+            ReplaceResult containing the cassette, screening primers, product sizes,
+            and genome location. Call result.save(output_prefix) to write files.
+
+        Raises:
+            ValueError: If target_sequence is not found in the genome, or marker_position
+                is not "upstream" or "downstream".
+
+        Example:
+            from Bio import SeqIO
+            replacement = SeqIO.read("pTEF1.fasta", "fasta")
+
+            designer = ReplaceDesigner(upstream_homology_len=200)
+            result = designer.design(
+                target_sequence="ATGCATGC...",
+                replacement_sequence=replacement,
+                marker_position="upstream",
+                name="YFG1_pTEF1_replace",
+            )
+            result.save(Path("output/YFG1_pTEF1_replace/YFG1_pTEF1_replace"))
+        """
+        if marker_position not in ("upstream", "downstream"):
+            raise ValueError(f"marker_position must be 'upstream' or 'downstream', got: {marker_position!r}")
+
+        self.target_sequence = target_sequence.upper()
+        self.replacement_sequence = replacement_sequence
+        self.marker_position = marker_position
+
+        if genome_location is not None:
+            self.genome_location = genome_location
+        else:
+            location = self.find_target_sequence(self.genome_file, self.target_sequence)
+            if location is None:
+                raise ValueError(f"Target sequence not found in genome: {self.genome_file}")
+            self.genome_location = location
+
+        cassette = self.make_replacement_cassette(self.genome_file, self.ura3_file)
+        cassette.name = name
+
+        fwd, rev, product_sizes = self.design_screening_strategy(self.genome_file)
+
+        return ReplaceResult(
+            name=name,
+            cassette=cassette,
+            forward_primer=fwd,
+            reverse_primer=rev,
+            product_sizes=product_sizes,
+            genome_location=self.genome_location,
+        )

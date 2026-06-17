@@ -135,6 +135,7 @@ celerybeat.pid
 # Environments
 .env
 .env*
+!.env.example
 .venv
 env/
 venv/
@@ -189,4 +190,5 @@ output/
 .pytest_cache
 .git
 .env*
+!.env.example
 .claude/
