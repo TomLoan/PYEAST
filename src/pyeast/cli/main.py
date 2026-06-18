@@ -1543,8 +1543,31 @@ def gg(library):
         raise click.Abort()
 
 @cli.command()
-@click.option("--model", default="claude-sonnet-4-6", show_default=True, help="Claude model to use.")
-def agent(model: str) -> None:
+@click.option(
+    "--provider",
+    type=click.Choice(["anthropic", "ollama", "openai"]),
+    default="anthropic",
+    show_default=True,
+    help="LLM backend to use: 'anthropic' (cloud), 'ollama' (local via Ollama), "
+    "or 'openai' (any OpenAI-compatible local server, e.g. LM Studio).",
+)
+@click.option(
+    "--model",
+    default=None,
+    help="Model identifier to use. "
+    "Defaults to claude-sonnet-4-6 for --provider anthropic. "
+    "Required for --provider ollama and --provider openai — pass the model name "
+    "exactly as shown in the server (e.g. 'qwen2.5' for Ollama, or the model key "
+    "from LM Studio's Developer tab for --provider openai).",
+)
+@click.option(
+    "--base-url",
+    default=None,
+    help="Base URL for the OpenAI-compatible server (--provider openai only). "
+    "Overrides the OPENAI_BASE_URL environment variable. "
+    "Defaults to http://localhost:1234/v1 (LM Studio default).",
+)
+def agent(provider: str, model: str | None, base_url: str | None) -> None:
     """Start an interactive LLM-powered experiment design session.
 
     \b
@@ -1553,10 +1576,36 @@ def agent(model: str) -> None:
     - design TAR cloning or gene deletion experiments
     - explain results and next wet-lab steps
 
-    Requires ANTHROPIC_API_KEY to be set (see .env.example).
+    \b
+    Provider setup:
+
+    \b
+    anthropic (default)
+      Requires ANTHROPIC_API_KEY set in the environment or a .env file.
+      See .env.example for the expected format.
+      Example: pyeast agent
+
+    \b
+    ollama
+      Requires a locally running Ollama server and a tool-calling-capable model.
+        1. Install Ollama and run: ollama serve
+        2. Pull a model:          ollama pull qwen2.5
+        3. Run the agent:         pyeast agent --provider ollama --model qwen2.5
+
+    \b
+    openai  (OpenAI-compatible servers, e.g. LM Studio)
+      Works with any server that exposes the /v1/chat/completions endpoint.
+      LM Studio quick-start:
+        1. Open LM Studio and load a tool-calling-capable model (e.g. Qwen2.5-7B).
+        2. Go to the Developer tab and click "Start Server" (default: localhost:1234).
+        3. Copy the model key shown in the Developer tab.
+        4. Run the agent:
+             pyeast agent --provider openai --model <model-key>
+      To point at a different server use --base-url or set OPENAI_BASE_URL in your .env file.
+      An OPENAI_API_KEY is not required for LM Studio but can be set if your server needs it.
     """
     from pyeast.agent import run_agent
-    run_agent(model=model)
+    run_agent(model=model, provider=provider, base_url=base_url)
 
 
 if __name__ == '__main__':

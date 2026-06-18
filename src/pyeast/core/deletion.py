@@ -71,7 +71,7 @@ class DeletionDesigner:
     def __init__(self,
                  upstream_homology_len: int = 300,
                  downstream_homology_len: int = 200,
-                 repeat_length: int = 160,
+                 repeat_length: int = 80,
                  genome_file: Optional[Path] = None,
                  ura3_file: Optional[Path] = None):
         """Initialize the DeletionDesigner.
@@ -79,7 +79,7 @@ class DeletionDesigner:
         Args:
             upstream_homology_len: Length of upstream homology for recombination (default: 300)
             downstream_homology_len: Length of downstream homology for recombination (default: 200)
-            repeat_length: Length of repeat sequence for marker removal (default: 160)
+            repeat_length: Length of repeat sequence for marker removal (default: 80)
             genome_file: Path to the genome file (default: BY4741_Toronto_2012.fsa from data directory)
             ura3_file: Path to the URA3 marker file (default: URA3.fasta from data directory)
         """

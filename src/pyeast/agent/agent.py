@@ -1,12 +1,10 @@
 """Interactive LLM-powered PYEAST experiment design agent."""
 
-import os
-import sys
 import warnings
 
-import anthropic
 from dotenv import load_dotenv
 
+from pyeast.agent.providers import AnthropicProvider, OllamaProvider, OpenAIProvider
 from pyeast.agent.tools import TOOL_SCHEMAS, dispatch_tool
 
 _SYSTEM_PROMPT = """\
@@ -87,17 +85,16 @@ subunit), use the same or equivalent promoter strength for both. Mismatched prom
 
 ## Multi-Part Replacement Sequences
 
-When a replacement sequence needs to combine multiple library parts (e.g. pTDH3 + a coding sequence):
+When a replacement sequence needs to combine two or more library parts (e.g. pTDH3 + a coding sequence):
 1. Use `read_component` to fetch each part's sequence
 2. Concatenate them in order as a single string
 3. Optionally `save_component` the combined sequence as a new reusable part
 4. Pass the concatenated string as `replacement_sequence` in `design_replacement`
 
-Example: replacing AGA2 promoter + inserting HFBI fusion:
+Example: replacing AGA2 promoter with pTDH3 and inserting HFBI fusion:
 ```
 pTDH3_seq = read_component("pTDH3", "Saccharomyces_cerevisiae")["sequence"]
 hfbi_seq  = read_component("HFBI_alpha_sec", "Saccharomyces_cerevisiae")["sequence"]
-aga2_seq  = lookup_gene_sequence("AGA2", "orf")["sequence"]
 replacement_sequence = pTDH3_seq + hfbi_seq + aga2_seq
 ```
 
@@ -141,20 +138,19 @@ ask for its sequence before attempting any design.
 """
 
 
-def run_agent(model: str = "claude-sonnet-4-6") -> None:
+def run_agent(model: str | None = None, provider: str = "anthropic", base_url: str | None = None) -> None:
     """Start an interactive PYEAST agent session."""
     load_dotenv()
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        print(
-            "Error: ANTHROPIC_API_KEY not set.\n"
-            "Add it to a .env file or export it as an environment variable.\n"
-            "See .env.example for the expected format."
-        )
-        sys.exit(1)
-
-    client = anthropic.Anthropic(api_key=api_key)
+    if provider == "anthropic":
+        llm = AnthropicProvider(model=model or "claude-sonnet-4-6")
+    elif provider == "ollama":
+        llm = OllamaProvider(model=model)
+    elif provider == "openai":
+        llm = OpenAIProvider(model=model, base_url=base_url)
+    else:
+        print(f"Error: unknown provider '{provider}'. Use 'anthropic', 'ollama', or 'openai'.")
+        return
 
     print(
         "PYEAST Agent\n"
@@ -186,49 +182,36 @@ def run_agent(model: str = "claude-sonnet-4-6") -> None:
         messages.append({"role": "user", "content": user_input})
         print("\nAssistant: ", end="", flush=True)
 
-        # Agentic loop: keep going until Claude finishes (no more tool calls)
+        # Agentic loop: keep going until the model finishes (no more tool calls)
         while True:
-            with client.messages.stream(
-                model=model,
-                max_tokens=32000,
-                system=[{
-                    "type": "text",
-                    "text": _SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }],
-                tools=TOOL_SCHEMAS,
-                messages=messages,
-            ) as stream:
-                for text in stream.text_stream:
-                    print(text, end="", flush=True)
-                response = stream.get_final_message()
+            response = llm.send(messages, _SYSTEM_PROMPT, TOOL_SCHEMAS)
 
             # Always append the full content (including any tool_use blocks)
-            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "assistant", "content": response["content"]})
 
-            if response.stop_reason == "end_turn":
+            if response["stop_reason"] == "end_turn":
                 print("\n")
                 break
 
-            if response.stop_reason == "tool_use":
+            if response["stop_reason"] == "tool_use":
                 print()
                 tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        print(f"  → {block.name}… ", end="", flush=True)
+                for block in response["content"]:
+                    if block["type"] == "tool_use":
+                        print(f"  → {block['name']}… ", end="", flush=True)
                         with warnings.catch_warnings():
                             warnings.simplefilter("ignore")
-                            result_str = dispatch_tool(block.name, block.input)
+                            result_str = dispatch_tool(block["name"], block["input"])
                         print("done")
                         tool_results.append({
                             "type": "tool_result",
-                            "tool_use_id": block.id,
+                            "tool_use_id": block["id"],
                             "content": result_str,
                         })
                 messages.append({"role": "user", "content": tool_results})
                 print()
             else:
-                if response.stop_reason == "max_tokens":
+                if response["stop_reason"] == "max_tokens":
                     print("\n[Response truncated — ask me to continue]\n")
                 else:
                     print("\n")

@@ -42,6 +42,7 @@ Run `pyeast --help` to see all available commands:
 | `pyeast replace` | Design replacement cassettes (scarless marker-recycling method)|
 | `pyeast gg` | Design Golden Gate / MoClo assemblies |
 | `pyeast batch` | Regenerate instruction files for previously designed assemblies |
+| `pyeast agent` | Interactive LLM-powered experiment design session |
 | `pyeast init` | Configure the data directory |
 
 For help with any command: `pyeast COMMAND --help`
@@ -73,6 +74,34 @@ Design Golden Gate assemblies using the MoClo standard. The following part libra
 To add parts to an existing kit, save a FASTA file to `component_libraries/<kit_name>/` in your data directory. For liquid-handling support, also save the matching plasmid `.gb` file to `component_libraries/<kit_name>/plasmids/` and add a well entry to `templates/TemPlates.xlsx`.
 
 To add a new Golden Gate kit, create a new subfolder in `component_libraries/` and follow the same structure.
+
+## LLM Agent
+
+`pyeast agent` starts an interactive session where you describe your experiment in plain language. The agent discovers available components, looks up gene sequences from SGD, designs TAR cloning, chromosomal integrations, gene deletions and replacements, and generates consolidated PCR batch instructions — calling the same underlying functions as the CLI commands.
+
+> **Note:** The agent is an interface layer over the standard design tools. Double-check outputs against direct CLI command results if you have any doubts.
+
+Three LLM backends are supported. Copy `.env.example` to `.env` and fill in the relevant keys.
+
+**Anthropic (default)** — requires `ANTHROPIC_API_KEY`.
+```bash
+pyeast agent
+```
+
+**Ollama** — requires a locally running [Ollama](https://ollama.com) server with a tool-calling model.
+```bash
+ollama serve && ollama pull qwen2.5
+pyeast agent --provider ollama --model qwen2.5
+```
+
+**OpenAI-compatible servers (e.g. LM Studio)** — requires a tool-calling model loaded and the server started in LM Studio's Developer tab.
+```bash
+pyeast agent --provider openai --model <model-key>
+# or, if your server is not on the default port (1234):
+pyeast agent --provider openai --model <model-key> --base-url http://localhost:5678/v1
+```
+
+For full setup instructions see [docs/](docs/).
 
 ## Private Data
 
@@ -127,11 +156,9 @@ pip install git+https://github.com/TomLoan/PYEAST.git
 
 ## Python API
 
-All designer classes can be imported and called directly — no interactive prompts, no CLI required. This is useful for scripting, Jupyter notebooks, or integrating PYEAST into larger pipelines.
+All designer classes can be imported and used directly — no interactive prompts, no CLI required. Useful for scripting, Jupyter notebooks, or integrating PYEAST into larger pipelines.
 
-Each designer follows the same pattern: create a designer, call `design()` with your inputs, get back a result object, and optionally call `result.save()` to write files.
-
-**TAR cloning**
+Each designer follows the same pattern: create a designer, call `design()` with your inputs, get back a result object, and call `result.save()` to write files.
 
 ```python
 from pathlib import Path
@@ -147,62 +174,9 @@ result = designer.design(
     name="my_plasmid",
 )
 result.save(Path("output/my_plasmid/my_plasmid"))
-# Writes: my_plasmid.gb, my_plasmid_instructions.tsv, my_plasmid_all_primers.tsv
 ```
 
-**Chromosomal integration**
-
-```python
-from pyeast.core.integration import IntegrationDesigner
-
-designer = IntegrationDesigner(homology_length=25)
-result = designer.design(
-    components_dir=get_component_libraries_path() / "Saccharomyces_cerevisiae",
-    assembly_order=["pTEF1", "YeGFP", "tCYC1"],
-    integration_site_name="HO",
-    primer_folder=get_primers_path(),
-    template_folder=get_templates_path(),
-    name="GFP_integration",
-)
-result.save(Path("output/GFP_integration/GFP_integration"))
-```
-
-**Gene deletion**
-
-```python
-from pyeast.core.deletion import DeletionDesigner
-
-designer = DeletionDesigner(upstream_homology_len=300, downstream_homology_len=200)
-result = designer.design(
-    target_sequence="ATGCATGC...",  # sequence to delete
-    name="YFG1_deletion",
-)
-result.save(Path("output/YFG1_deletion/YFG1_deletion"))
-# Writes: .gb, .fasta, _screening_primers.tsv
-```
-
-**Gene replacement**
-
-```python
-from Bio import SeqIO
-from pyeast.core.replace import ReplaceDesigner
-
-replacement = SeqIO.read("pTEF1.fasta", "fasta")
-designer = ReplaceDesigner(upstream_homology_len=200)
-result = designer.design(
-    target_sequence="ATGCATGC...",  # sequence to replace
-    replacement_sequence=replacement,
-    marker_position="upstream",    # or "downstream"
-    name="YFG1_pTEF1_replace",
-)
-result.save(Path("output/YFG1_pTEF1_replace/YFG1_pTEF1_replace"))
-```
-
-The `genome_file` and `ura3_file` paths used by deletion and replacement designers default to the configured data directory. You can override them in the constructor:
-
-```python
-designer = DeletionDesigner(genome_file=Path("my_genome.fsa"), ura3_file=Path("URA3.fasta"))
-```
+The same `designer.design() → result.save()` pattern applies to `IntegrationDesigner`, `DeletionDesigner`, and `ReplaceDesigner`. See [docs/](docs/) or run `help(ClassName)` for constructor options and full parameter details.
 
 ## For Developers
 
