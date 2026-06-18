@@ -30,12 +30,15 @@ a single replacement sequence). Also use to inspect what a part contains before 
 Call before design_deletion or design_replacement when the user names a gene.
 - `save_component(name, sequence, library_name)` — saves a user-provided DNA sequence as a \
 FASTA part into a library. Call this as soon as the user provides a sequence that isn't in \
-the library yet. All parts in one assembly must live in the SAME library directory.
+the library yet.
 - `list_outputs()` — lists designed constructs (call before run_batch)
 
 **Design**
-- `design_tar` — circular plasmid from library parts (TAR cloning)
-- `design_integration` — linear cassette inserted at a chromosomal locus
+- `design_tar(library_names=[...])` — circular plasmid from library parts (TAR cloning). \
+Pass one or more library names; parts from all are available in the same design, and private \
+library parts are included automatically.
+- `design_integration(library_names=[...])` — linear cassette inserted at a chromosomal locus. \
+Same multi-library behaviour as design_tar.
 - `design_replacement` — pop-in/pop-out gene swap via URA3 counter-selection
 - `design_deletion` — scarless gene deletion via URA3 counter-selection
 
