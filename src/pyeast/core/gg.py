@@ -336,7 +336,7 @@ class ggDesigner:
             output_path: Path to output folder.
             assembly_name: Name prefix for output files.
             liquid_handler: Liquid handler to generate instructions for.
-                One of 'janus', 'hamilton', 'epmotion', or 'human' (default: 'human').
+                One of 'janus', 'hamilton', 'epmotion', or 'human' (default: 'human'), or matching index.
         """
         all_construct_data = self.assembly_sim.compute_all_construct_data_dicts()
         for i, dict in enumerate(all_construct_data):
@@ -364,8 +364,8 @@ class ggDesigner:
             instructions_dataframe = instructions_dataframe.drop_duplicates(subset=["wells"]).reset_index(drop=True)
 
         liquid_handler = liquid_handler.strip().lower()
-
-        if liquid_handler == "janus" or liquid_handler == "hamilton":
+        
+        if liquid_handler == "janus" or liquid_handler == "hamilton" or liquid_handler == str(self.instruments.index('Janus')+1) or liquid_handler ==str(self.instruments.index('Hamilton')+1):
             # instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
             instructions_dataframe[['asperate_plate', 'asperate_well']] = pd.DataFrame(instructions_dataframe['wells'].to_list())
             instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
@@ -385,7 +385,7 @@ class ggDesigner:
             # janus_instructions.loc[0, 'new_tip'] = 'T'
             # janus_instructions.loc[len(janus_instructions)-1, 'drop_tip'] = 'T'
 
-        elif liquid_handler == 'epmotion':
+        elif liquid_handler == 'epmotion' or liquid_handler == str(self.instruments.index('epMotion')):
             header = [
                 ['Labware', 'Src.Barcode', 'Src.List Name', 'Dest.Barcode', 'Dest.List name', '', '', ''],
                 ['', '', '', '', '', '', '', ''],
@@ -422,7 +422,7 @@ class ggDesigner:
                 writer.writerows(epmotion_instructions.values)
             logger.info(f"Saved epMotion instructions to {output_path}/{assembly_name}_epmotion_instructions.csv")
 
-        elif liquid_handler == 'human':
+        elif liquid_handler == 'human' or liquid_handler == str(self.instruments.index('Human')+1):
             volume_per_part = 1  # µL
             filename = f'{output_path}/{assembly_name}_human_instructions.txt'
 

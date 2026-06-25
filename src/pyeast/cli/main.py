@@ -159,8 +159,8 @@ def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> 
         completer = WordCompleter(machines, ignore_case=True)
 
         selection = session.prompt("Which machine would you like to use? \n", completer = completer).strip().lower()
-
-        if selection == "epmotion":
+        #console.print(selection, type(selection))
+        if selection == "epmotion" or selection == 1:
             if click.confirm("Generate epMotion instructions?"):
                 try:
                     timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
@@ -171,7 +171,7 @@ def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> 
                 except Exception as e:
                     console.print(f"[red]Error generating machine instructions: {str(e)}[/red]")
 
-        if selection == "janus"or selection =='hamilton':
+        if selection == "janus"or selection =='hamilton' or selection == 2 or selection == 3:
             if click.confirm(f"Generate worklist for {selection}?"):
                 try:
                     timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
@@ -181,6 +181,8 @@ def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> 
                     designer.generate_machine_assembly_instructions(output_prefix, 'janus', timestamp)
                 except Exception as e:
                     console.print(f"[red]Error generating machine instructions: {str(e)}[/red]")
+        elif selection not in machines: 
+            console.print(f"{selection} not supported, no instructions generated")
 
     else:
         pass
@@ -421,6 +423,7 @@ def get_gg_liquid_handler(instruments: list) -> str:
         "Select a liquid handler for instruction formatting: ",
         completer=completer,
     ).strip().lower()
+    
     return selection
 
 
