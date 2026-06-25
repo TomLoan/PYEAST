@@ -32,7 +32,7 @@ import csv
 import logging
 from pathlib import Path
 from typing import Optional
-
+import warnings
 import dnacauldron as dc
 import openpyxl
 import pandas as pd
@@ -336,7 +336,7 @@ class ggDesigner:
             output_path: Path to output folder.
             assembly_name: Name prefix for output files.
             liquid_handler: Liquid handler to generate instructions for.
-                One of 'janus', 'hamilton', 'epmotion', or 'human' (default: 'human').
+                One of 'janus', 'hamilton', 'epmotion', or 'human' (default: 'human'), or matching index.
         """
         all_construct_data = self.assembly_sim.compute_all_construct_data_dicts()
         for i, dict in enumerate(all_construct_data):
@@ -365,7 +365,17 @@ class ggDesigner:
 
         liquid_handler = liquid_handler.strip().lower()
 
-        if liquid_handler == "janus" or liquid_handler == "hamilton":
+        if liquid_handler.isdigit():
+            idx = int(liquid_handler) - 1
+            if 0 <= idx < len(self.instruments):
+                liquid_handler = self.instruments[idx].lower()
+            else:
+                raise ValueError(
+                    f"Invalid liquid handler index '{int(liquid_handler)}'. "
+                    f"Choose 1-{len(self.instruments)}."
+                )
+
+        if liquid_handler in ("janus", "hamilton"):
             # instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
             instructions_dataframe[['asperate_plate', 'asperate_well']] = pd.DataFrame(instructions_dataframe['wells'].to_list())
             instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
@@ -467,6 +477,12 @@ class ggDesigner:
                     f.write('\n[ ] Assembly complete\n')
                     f.write('\n\n')
                 logger.info(f"Saved instructions to {output_path}/{assembly_name}_human_instructions.txt")
+
+        else:
+            valid = [i.lower() for i in self.instruments]
+            raise ValueError(
+                f"Unknown liquid handler '{liquid_handler}'. Valid options: {valid}"
+            )
 
 
 

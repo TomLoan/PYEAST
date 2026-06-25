@@ -149,35 +149,46 @@ def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> 
     session = PromptSession()
 
     if click.confirm("\nWould you like to generate machine instructions for liquid handling?"):
-        # Select from available machines
         machines = ['epMotion', 'Janus', 'Hamilton']
-
-        print("\nAvailable liquid handling machines:")
-        for i, machine in enumerate(machines, 1):
-            print(f"{i}. {machine}")
-
+        valid_names = [m.lower() for m in machines]
+        valid_indices = [str(i) for i in range(1, len(machines) + 1)]
         completer = WordCompleter(machines, ignore_case=True)
 
-        selection = session.prompt("Which machine would you like to use? \n", completer = completer).strip().lower()
+        while True:
+            print("\nAvailable liquid handling machines:")
+            for i, machine in enumerate(machines, 1):
+                print(f"{i}. {machine}")
+
+            selection = session.prompt("Which machine would you like to use? \n", completer=completer).strip().lower()
+
+            if selection.isdigit():
+                idx = int(selection) - 1
+                if 0 <= idx < len(machines):
+                    selection = machines[idx].lower()
+                else:
+                    console.print(f"[red]Invalid selection '{selection}'. Enter a name or number 1-{len(machines)}.[/red]")
+                    continue
+
+            if selection not in valid_names:
+                console.print(f"[red]Invalid selection '{selection}'. Enter a name or number 1-{len(machines)}.[/red]")
+                continue
+
+            break
 
         if selection == "epmotion":
             if click.confirm("Generate epMotion instructions?"):
                 try:
                     timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
-                    # Write instructions for the PCR set up
                     designer.generate_epmotion_instructions(output_prefix, timestamp)
-                    # Write instructions for the assembly transformations
                     designer.generate_machine_assembly_instructions(output_prefix, 'epmotion', timestamp)
                 except Exception as e:
                     console.print(f"[red]Error generating machine instructions: {str(e)}[/red]")
 
-        if selection == "janus"or selection =='hamilton':
+        elif selection in ("janus", "hamilton"):
             if click.confirm(f"Generate worklist for {selection}?"):
                 try:
                     timestamp = datetime.now().strftime("%H-%M-%d-%b-%Y").upper()
-                    # Write instructions for the PCR set up
                     designer.generate_janus_instructions(output_prefix, timestamp)
-                    # Write instructions for the assembly transformations
                     designer.generate_machine_assembly_instructions(output_prefix, 'janus', timestamp)
                 except Exception as e:
                     console.print(f"[red]Error generating machine instructions: {str(e)}[/red]")
@@ -413,15 +424,26 @@ def get_gg_liquid_handler(instruments: list) -> str:
     Returns the selected instrument name as a lowercase string.
     """
     session = PromptSession()
-    console.print("\n[blue]Available liquid handlers:[/blue]")
-    for i, instrument in enumerate(instruments, 1):
-        console.print(f"  {i}: {instrument}")
+    valid_names = [i.lower() for i in instruments]
+    valid_indices = [str(i) for i in range(1, len(instruments) + 1)]
     completer = WordCompleter(instruments, ignore_case=True)
-    selection = session.prompt(
-        "Select a liquid handler for instruction formatting: ",
-        completer=completer,
-    ).strip().lower()
-    return selection
+
+    while True:
+        console.print("\n[blue]Available liquid handlers:[/blue]")
+        for i, instrument in enumerate(instruments, 1):
+            console.print(f"  {i}: {instrument}")
+        selection = session.prompt(
+            "Select a liquid handler for instruction formatting: ",
+            completer=completer,
+        ).strip().lower()
+
+        if selection in valid_names or selection in valid_indices:
+            return selection
+
+        console.print(
+            f"[red]Invalid selection '{selection}'. "
+            f"Enter a name or number 1-{len(instruments)}.[/red]"
+        )
 
 
 def print_sequence_grid(sequences: dict, title: str = "Available Sequences"):
