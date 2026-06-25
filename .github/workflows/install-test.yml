@@ -1,4 +1,4 @@
-name: Installation Test
+﻿name: Installation Test
 
 on:
   push:
@@ -43,6 +43,11 @@ jobs:
         run: |
           python -c "import os; os.makedirs('test_data_dir', exist_ok=True)"
           uv run pyeast init --data-dir ./test_data_dir
+
+      - name: Set up PYEAST data repo for integration tests
+        run: |
+          git clone https://github.com/TomLoan/PYEAST_data.git ~/.pyeast/data-repo
+          uv run pyeast init --data-dir ~/.pyeast/data-repo
 
       - name: Run test suite
         run: |

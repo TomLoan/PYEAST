@@ -364,8 +364,18 @@ class ggDesigner:
             instructions_dataframe = instructions_dataframe.drop_duplicates(subset=["wells"]).reset_index(drop=True)
 
         liquid_handler = liquid_handler.strip().lower()
-        
-        if liquid_handler == "janus" or liquid_handler == "hamilton" or liquid_handler == str(self.instruments.index('Janus')+1) or liquid_handler ==str(self.instruments.index('Hamilton')+1):
+
+        if liquid_handler.isdigit():
+            idx = int(liquid_handler) - 1
+            if 0 <= idx < len(self.instruments):
+                liquid_handler = self.instruments[idx].lower()
+            else:
+                raise ValueError(
+                    f"Invalid liquid handler index '{int(liquid_handler)}'. "
+                    f"Choose 1-{len(self.instruments)}."
+                )
+
+        if liquid_handler in ("janus", "hamilton"):
             # instructions_dataframe = all_info_dataframe.explode("wells").reset_index(drop=True)
             instructions_dataframe[['asperate_plate', 'asperate_well']] = pd.DataFrame(instructions_dataframe['wells'].to_list())
             instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
@@ -385,7 +395,7 @@ class ggDesigner:
             # janus_instructions.loc[0, 'new_tip'] = 'T'
             # janus_instructions.loc[len(janus_instructions)-1, 'drop_tip'] = 'T'
 
-        elif liquid_handler == 'epmotion' or liquid_handler == str(self.instruments.index('epMotion')):
+        elif liquid_handler == 'epmotion':
             header = [
                 ['Labware', 'Src.Barcode', 'Src.List Name', 'Dest.Barcode', 'Dest.List name', '', '', ''],
                 ['', '', '', '', '', '', '', ''],
@@ -422,7 +432,7 @@ class ggDesigner:
                 writer.writerows(epmotion_instructions.values)
             logger.info(f"Saved epMotion instructions to {output_path}/{assembly_name}_epmotion_instructions.csv")
 
-        elif liquid_handler == 'human' or liquid_handler == str(self.instruments.index('Human')+1):
+        elif liquid_handler == 'human':
             volume_per_part = 1  # µL
             filename = f'{output_path}/{assembly_name}_human_instructions.txt'
 
@@ -467,6 +477,12 @@ class ggDesigner:
                     f.write('\n[ ] Assembly complete\n')
                     f.write('\n\n')
                 logger.info(f"Saved instructions to {output_path}/{assembly_name}_human_instructions.txt")
+
+        else:
+            valid = [i.lower() for i in self.instruments]
+            raise ValueError(
+                f"Unknown liquid handler '{liquid_handler}'. Valid options: {valid}"
+            )
 
 
 
