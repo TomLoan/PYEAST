@@ -1,6 +1,8 @@
 """Tool schemas and handlers for the PYEAST agent."""
 
 import json
+import shutil
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -93,9 +95,7 @@ TOOL_SCHEMAS = [
         "name": "save_component",
         "description": (
             "Save a user-provided DNA sequence as a FASTA part in a component library, "
-            "making it immediately available for design_tar and design_integration. "
-            "IMPORTANT: all parts in one assembly must be in the SAME library — save the "
-            "new part to the same library you will use for the design call."
+            "making it immediately available for design_tar and design_integration."
         ),
         "input_schema": {
             "type": "object",
@@ -134,7 +134,10 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "design_tar",
-        "description": "Assemble library parts into a circular plasmid via TAR cloning.",
+        "description": (
+            "Assemble library parts into a circular plasmid via TAR cloning. "
+            "Parts from all listed libraries (public and private) are merged automatically."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -144,14 +147,21 @@ TOOL_SCHEMAS = [
                     "items": {"type": "string"},
                     "description": "Ordered part names, 5' to 3'.",
                 },
-                "library_name": {"type": "string", "description": "Library folder."},
+                "library_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "One or more library folder names. Parts from all are available in the design.",
+                },
             },
-            "required": ["name", "assembly_order", "library_name"],
+            "required": ["name", "assembly_order", "library_names"],
         },
     },
     {
         "name": "design_integration",
-        "description": "Insert a linear cassette at a chromosomal locus via homologous recombination.",
+        "description": (
+            "Insert a linear cassette at a chromosomal locus via homologous recombination. "
+            "Parts from all listed libraries (public and private) are merged automatically."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -161,13 +171,17 @@ TOOL_SCHEMAS = [
                     "items": {"type": "string"},
                     "description": "Part names to integrate, 5' to 3' (flanks not included).",
                 },
-                "library_name": {"type": "string", "description": "Library folder."},
+                "library_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "One or more library folder names. Parts from all are available in the design.",
+                },
                 "integration_site_name": {
                     "type": "string",
                     "description": "Integration locus name (e.g. 'HO', 'HIS3', 'LEU2').",
                 },
             },
-            "required": ["name", "assembly_order", "library_name", "integration_site_name"],
+            "required": ["name", "assembly_order", "library_names", "integration_site_name"],
         },
     },
     {
@@ -292,29 +306,39 @@ def _handle_lookup_gene_sequence(gene_name: str, sequence_type: str = "orf") -> 
 
 
 def _handle_list_components(component_type: str, library_name: str | None = None) -> dict:
+    pub_base = get_component_libraries_path()
+    priv_base = get_component_libraries_path(private=True)
+
     if component_type == "libraries":
-        path = get_component_libraries_path()
-        if not path.exists():
+        if not pub_base.exists():
             return {
-                "error": f"Component libraries not found at {path}. "
+                "error": f"Component libraries not found at {pub_base}. "
                 "Run 'pyeast init' to configure your data directory."
             }
-        libs = sorted([d.name for d in path.iterdir() if d.is_dir()])
-        return {"libraries": libs, "count": len(libs)}
+        pub_libs = {d.name for d in pub_base.iterdir() if d.is_dir()}
+        priv_libs = {d.name for d in priv_base.iterdir() if d.is_dir()} if priv_base.exists() else set()
+        all_libs = sorted(pub_libs | priv_libs)
+        return {
+            "libraries": all_libs,
+            "private_libraries": sorted(priv_libs),
+            "count": len(all_libs),
+        }
 
     if component_type == "components":
         if not library_name:
             return {"error": "library_name is required when component_type='components'"}
-        path = get_component_libraries_path() / library_name
-        if not path.exists():
-            base = get_component_libraries_path()
-            available = sorted([d.name for d in base.iterdir() if d.is_dir()]) if base.exists() else []
-            return {"error": f"Library '{library_name}' not found.", "available_libraries": available}
-        components = sorted([
-            f.stem for f in path.iterdir()
-            if f.is_file() and f.suffix.lower() in _SEQ_EXTENSIONS
-        ])
-        return {"library": library_name, "components": components, "count": len(components)}
+        parts: set[str] = set()
+        found_any = False
+        for base in [pub_base, priv_base]:
+            lib = base / library_name
+            if lib.exists():
+                found_any = True
+                parts |= {f.stem for f in lib.iterdir() if f.is_file() and f.suffix.lower() in _SEQ_EXTENSIONS}
+        if not found_any:
+            all_libs = sorted({d.name for d in pub_base.iterdir() if d.is_dir()} |
+                              ({d.name for d in priv_base.iterdir() if d.is_dir()} if priv_base.exists() else set()))
+            return {"error": f"Library '{library_name}' not found.", "available_libraries": all_libs}
+        return {"library": library_name, "components": sorted(parts), "count": len(parts)}
 
     if component_type == "integration_sites":
         path = get_integration_sites_path()
@@ -358,30 +382,30 @@ def _handle_list_outputs() -> dict:
 def _handle_read_component(name: str, library_name: str) -> dict:
     from Bio import SeqIO
 
-    library_path = get_component_libraries_path() / library_name
-    if not library_path.exists():
-        return {"success": False, "error": f"Library '{library_name}' not found."}
+    pub_base = get_component_libraries_path()
+    priv_base = get_component_libraries_path(private=True)
 
-    for ext in (".fasta", ".fa", ".gb", ".genbank", ".gbk"):
-        file_path = library_path / f"{name}{ext}"
-        if file_path.exists():
-            fmt = "genbank" if ext in (".gb", ".genbank", ".gbk") else "fasta"
-            try:
-                record = SeqIO.read(str(file_path), fmt)
-                return {
-                    "success": True,
-                    "name": name,
-                    "library": library_name,
-                    "sequence": str(record.seq),
-                    "length_bp": len(record.seq),
-                    "description": record.description,
-                }
-            except Exception as e:
-                return {"success": False, "error": f"Failed to parse {file_path.name}: {e}"}
+    for base in [priv_base, pub_base]:  # private takes precedence
+        for ext in (".fasta", ".fa", ".gb", ".genbank", ".gbk"):
+            file_path = base / library_name / f"{name}{ext}"
+            if file_path.exists():
+                fmt = "genbank" if ext in (".gb", ".genbank", ".gbk") else "fasta"
+                try:
+                    record = SeqIO.read(str(file_path), fmt)
+                    return {
+                        "success": True,
+                        "name": name,
+                        "library": library_name,
+                        "sequence": str(record.seq),
+                        "length_bp": len(record.seq),
+                        "description": record.description,
+                    }
+                except Exception as e:
+                    return {"success": False, "error": f"Failed to parse {file_path.name}: {e}"}
 
     return {
         "success": False,
-        "error": f"Part '{name}' not found in library '{library_name}'. "
+        "error": f"Part '{name}' not found in library '{library_name}' (public or private). "
         "Use list_components to see available parts.",
     }
 
@@ -444,29 +468,45 @@ def _handle_save_component(
     }
 
 
-def _check_parts_exist(library_name: str, assembly_order: list[str]) -> list[str]:
-    """Return a list of part names from assembly_order that are NOT found in the library."""
-    path = get_component_libraries_path() / library_name
-    if not path.exists():
-        return assembly_order  # all missing if library not found
-    available = {f.stem for f in path.iterdir() if f.is_file() and f.suffix.lower() in _SEQ_EXTENSIONS}
+def _merge_libraries_to_tempdir(library_names: list[str]) -> Path:
+    """Copy parts from named libraries (public + private) into a fresh temp directory.
+    Private files overwrite public files with the same name. Caller must rmtree when done."""
+    tmpdir = Path(tempfile.mkdtemp())
+    pub_base = get_component_libraries_path()
+    priv_base = get_component_libraries_path(private=True)
+    for lib_name in library_names:
+        for base in [pub_base, priv_base]:
+            lib_path = base / lib_name
+            if lib_path.exists():
+                for f in lib_path.iterdir():
+                    if f.is_file() and f.suffix.lower() in _SEQ_EXTENSIONS:
+                        shutil.copy2(f, tmpdir / f.name)
+    return tmpdir
+
+
+def _find_missing_parts(library_names: list[str], assembly_order: list[str]) -> list[str]:
+    """Return part names from assembly_order not found in any of the named libraries (public or private)."""
+    pub_base = get_component_libraries_path()
+    priv_base = get_component_libraries_path(private=True)
+    available: set[str] = set()
+    for lib_name in library_names:
+        for base in [pub_base, priv_base]:
+            lib_path = base / lib_name
+            if lib_path.exists():
+                available |= {f.stem for f in lib_path.iterdir() if f.is_file() and f.suffix.lower() in _SEQ_EXTENSIONS}
     return [p for p in assembly_order if p not in available]
 
 
-def _handle_design_tar(name: str, assembly_order: list[str], library_name: str) -> dict:
+def _handle_design_tar(name: str, assembly_order: list[str], library_names: list[str]) -> dict:
     from pyeast.core.tar import TARDesigner
 
-    library_path = get_component_libraries_path() / library_name
-    if not library_path.exists():
-        return {"success": False, "error": f"Library '{library_name}' not found"}
-
-    missing = _check_parts_exist(library_name, assembly_order)
+    missing = _find_missing_parts(library_names, assembly_order)
     if missing:
         return {
             "success": False,
             "missing_parts": missing,
             "error": (
-                f"Cannot design: {len(missing)} part(s) not found in library '{library_name}': "
+                f"Cannot design: {len(missing)} part(s) not found in libraries {library_names}: "
                 f"{missing}. "
                 "Ask the user to provide the DNA sequence(s) for these parts before proceeding."
             ),
@@ -475,15 +515,19 @@ def _handle_design_tar(name: str, assembly_order: list[str], library_name: str) 
     output_dir = ensure_output_dir_exists(name)
     output_prefix = output_dir / name
 
-    designer = TARDesigner()
-    result = designer.design(
-        library_path=library_path,
-        assembly_order=assembly_order,
-        primer_folder=get_primers_path(),
-        template_folder=get_templates_path(),
-        name=name,
-    )
-    result.save(output_prefix)
+    tmpdir = _merge_libraries_to_tempdir(library_names)
+    try:
+        designer = TARDesigner()
+        result = designer.design(
+            library_path=tmpdir,
+            assembly_order=assembly_order,
+            primer_folder=get_primers_path(),
+            template_folder=get_templates_path(),
+            name=name,
+        )
+        result.save(output_prefix)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
     output_files = [
         str(output_prefix) + ".gb",
@@ -514,22 +558,18 @@ def _handle_design_tar(name: str, assembly_order: list[str], library_name: str) 
 def _handle_design_integration(
     name: str,
     assembly_order: list[str],
-    library_name: str,
+    library_names: list[str],
     integration_site_name: str,
 ) -> dict:
     from pyeast.core.integration import IntegrationDesigner
 
-    library_path = get_component_libraries_path() / library_name
-    if not library_path.exists():
-        return {"success": False, "error": f"Library '{library_name}' not found"}
-
-    missing = _check_parts_exist(library_name, assembly_order)
+    missing = _find_missing_parts(library_names, assembly_order)
     if missing:
         return {
             "success": False,
             "missing_parts": missing,
             "error": (
-                f"Cannot design: {len(missing)} part(s) not found in library '{library_name}': "
+                f"Cannot design: {len(missing)} part(s) not found in libraries {library_names}: "
                 f"{missing}. "
                 "Ask the user to provide the DNA sequence(s) for these parts before proceeding."
             ),
@@ -538,16 +578,20 @@ def _handle_design_integration(
     output_dir = ensure_output_dir_exists(name)
     output_prefix = output_dir / name
 
-    designer = IntegrationDesigner()
-    result = designer.design(
-        components_dir=library_path,
-        assembly_order=assembly_order,
-        integration_site_name=integration_site_name,
-        primer_folder=get_primers_path(),
-        template_folder=get_templates_path(),
-        name=name,
-    )
-    result.save(output_prefix)
+    tmpdir = _merge_libraries_to_tempdir(library_names)
+    try:
+        designer = IntegrationDesigner()
+        result = designer.design(
+            components_dir=tmpdir,
+            assembly_order=assembly_order,
+            integration_site_name=integration_site_name,
+            primer_folder=get_primers_path(),
+            template_folder=get_templates_path(),
+            name=name,
+        )
+        result.save(output_prefix)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
     output_files = [
         str(output_prefix) + ".gb",
@@ -794,13 +838,13 @@ def dispatch_tool(tool_name: str, tool_input: dict) -> str:
             result = _handle_design_tar(
                 name=tool_input["name"],
                 assembly_order=tool_input["assembly_order"],
-                library_name=tool_input["library_name"],
+                library_names=tool_input["library_names"],
             )
         elif tool_name == "design_integration":
             result = _handle_design_integration(
                 name=tool_input["name"],
                 assembly_order=tool_input["assembly_order"],
-                library_name=tool_input["library_name"],
+                library_names=tool_input["library_names"],
                 integration_site_name=tool_input["integration_site_name"],
             )
         elif tool_name == "design_replacement":
