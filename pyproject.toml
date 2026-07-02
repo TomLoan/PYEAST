@@ -1,10 +1,24 @@
 [project]
 name = "pyeast"
-version = "1.1.1"
-description = "A python tool kit for yeast engineering"
-requires-python = ">=3.12"
+dynamic = ["version"]
+description = "A Python toolkit for yeast engineering"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-2.0-only"
+license-files = ["LICENSE.txt"]
 authors = [
     { name = "Thomas Loan", email = "Tom.Loan27@gmail.com" },
+]
+keywords = ["yeast", "synthetic-biology", "cloning", "primer-design", "bioinformatics", "TAR", "golden-gate"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
 ]
 
 dependencies = [
@@ -24,17 +38,30 @@ dependencies = [
     "dnacauldron>=2.0.12",
     "pydna>=5.5.0",
     "tabulate>=0.9.0",
-    "wheel>=0.46.2",
     "pyyaml>=6.0",
-    "anthropic>=0.50.0",
 ]
+
+[project.optional-dependencies]
+agent = ["anthropic>=0.50.0"]
+
+[project.urls]
+Homepage = "https://github.com/TomLoan/PYEAST"
+Repository = "https://github.com/TomLoan/PYEAST"
+"Bug Tracker" = "https://github.com/TomLoan/PYEAST/issues"
+Preprint = "https://doi.org/10.1101/2025.05.19.655004"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+path = "src/pyeast/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyeast"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["src/pyeast", "README.md", "LICENSE.txt", "COPYRIGHT.txt", "CONTRIBUTING.md"]
 
 [tool.uv]
 package = true
@@ -59,8 +86,6 @@ dev-dependencies = [
     "rst-to-myst[sphinx]>=0.4.0",
     "pytest-timeout>=2.3.1",
     "twine>=5.1.1",
-    "toml-cli>=0.7.0",
-    "pathspec>=0.12.1",
 ]
 
 [dependency-groups]
@@ -77,15 +102,11 @@ dev = [
 [project.scripts]
 pyeast = "pyeast.cli.main:cli"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
 # Automation of common build tasks etc.  Run with: `poe <target>`, eg. `poe clean`.
 # See https://github.com/nat-n/poethepoet for details.
 [tool.poe.tasks]
-rename_template = {cmd = "uv run python src/initialise_project.py", help = "Rename the template project to your project name.  Run this immediately after cloning the template!"}
 init = { shell = "uv sync; uv run pre-commit install;", help = "(Re)initialise the project, e.g. install updated dependencies (e.g. after a pull/merge)", interpreter = "posix" }
-run = { cmd = "uv run python src/python_template_uv/example.py", help = "Run the project" }
+run = { cmd = "uv run pyeast --help", help = "Run the pyeast CLI" }
 clean = { shell = "rm -rf .coverage .mypy_cache .pytest_cache dist ./**/__pycache__ docs/build/ dist docs/build docs/source/_static docs/source/wpf.*.rst", help = "Clean up build artifacts", interpreter = "posix" }
 clean_outputs = { shell = "rm -rf output/ results/", help = "Cleans output dirs: output/ & results/", interpreter = "posix" }
 lint = { shell = "uv run --with pre-commit-uv git add .pre-commit-config.yaml pyproject.toml & pre-commit run", help = "Run pre-commit hooks" }
@@ -93,8 +114,8 @@ alint = { shell = "uv run --with pre-commit-uv git add *.yaml *.yml *.toml *.py 
 lint_all = { shell = "uv run --with pre-commit-uv git add *.yaml *.yml *.toml *.py && pre-commit run --all-files", help = "Git-adds config & code, then run pre-commit hooks on all files", interpreter = "posix" }
 test = { cmd = "uv run pytest --cov-report html --cov-report term-missing --cov=src/ tests", help = "Run unit tests with pytest" }
 publish = { shell = "uv build; uv run twine upload --repository-url $PUBLISH_URL -u $PUBLISH_USER -p $PUBLISH_PASSWORD dist/*", help = "Publish the package to private pypi repo.  Set $PUBLISH_URL, $PUBLISH_USER, $PUBLISH_PASSWORD in your environment beforehand.", interpreter = "posix" }
-version = { shell = "version=`toml get --toml-path pyproject.toml project.version`; echo $version", help = "Get the current version from pyproject.toml" }
-release = { shell = "version=`toml get --toml-path pyproject.toml project.version` && git tag -a v$version -m 'Release version $version' && git push --tags", help = "Parse version from pyproject.toml, create and push tag to trigger release action. Test versions should be of the form X.Y.ZrcN (e.g. 0.2.1rc2)." }
+version = { shell = "version=`uv run python -c 'import pyeast; print(pyeast.__version__)'`; echo $version", help = "Get the current version from pyeast.__version__" }
+release = { shell = "version=`uv run python -c 'import pyeast; print(pyeast.__version__)'` && git tag -a v$version -m 'Release version $version' && git push --tags", help = "Parse version from pyeast.__version__, create and push tag to trigger release action. Test versions should be of the form X.Y.ZrcN (e.g. 0.2.1rc2)." }
 docker_build = { cmd = "docker compose build --progress plain", help = "Build the docker compose images" }
 docker_run = { cmd = "docker compose run --rm --build main", help = "Run the main docker compose container" }
 docker_test = { cmd = "docker compose run --rm test", help = "Run the test docker compose container" }
@@ -105,7 +126,7 @@ show_doc = { expr = "webbrowser.open('file://' + str(pathlib.Path('docs/build/in
 
 # Internal tasks used by other tasks, not callable directly
 _doc_dir = { script = "os:makedirs('docs/source/_static', exist_ok=True)" }
-_pyreverse = { cmd = "pyreverse --output-directory docs/source/_static/ --output html src/python_template_uv" } # FIXME `--output png` for UML diagrams only works if native graphviz is installed
+_pyreverse = { cmd = "pyreverse --output-directory docs/source/_static/ --output html src/pyeast" } # FIXME `--output png` for UML diagrams only works if native graphviz is installed
 _licenses = { cmd = "pip-licenses -f md --output-file docs/source/licenses.md" }
 _apidoc = { cmd = "sphinx-apidoc -f -o docs/source/ src/" }
 _sphinx = { cmd = "sphinx-build -b html docs/source docs/build" }
@@ -114,7 +135,7 @@ _sphinx = { cmd = "sphinx-build -b html docs/source docs/build" }
 # Config for various pre-commit checks are below
 # Ruff linting rules - see https://github.com/charliermarsh/ruff and https://beta.ruff.rs/docs/rules/
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 150
 
 

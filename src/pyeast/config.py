@@ -3,7 +3,7 @@
 This module handles configuration loading and data path resolution.
 Configuration priority (highest to lowest):
 1. Environment variables (PYEAST_DATA_DIR, PYEAST_OUTPUT_DIR)
-2. Config file (~/.pyeast/config.yaml)
+2. Config file (~/PYEAST/config.yaml)
 3. Default locations (~/PYEAST/data/)
 """
 
@@ -44,7 +44,7 @@ class PyeastConfig:
             if path.exists():
                 return path.resolve()
 
-        # Priority 3: Ufault user directory Fallback for legancy installs 
+        # Priority 3: Default user directory. Fallback for legacy installs.
         # Not intended for normal use
         return (Path.home() / "PYEAST" / "data").resolve()
 
@@ -70,8 +70,18 @@ class PyeastConfig:
         return (Path.home() / "PYEAST" / "output").resolve()
 
     def _load_config_file(self) -> Optional[dict]:
-        """Load configuration from ~/.pyeast/config.yaml if it exists."""
-        config_file = Path.home() / ".pyeast" / "config.yaml"
+        """Load configuration from ~/PYEAST/config.yaml if it exists.
+
+        Falls back to the legacy ~/.pyeast/config.yaml location (read-only) so
+        installs created before the layout change keep working until the user
+        re-runs `pyeast init`.
+        """
+        config_file = Path.home() / "PYEAST" / "config.yaml"
+        if not config_file.exists():
+            # Legacy migration fallback (read-only; never written to again)
+            legacy_file = Path.home() / ".pyeast" / "config.yaml"
+            if legacy_file.exists():
+                config_file = legacy_file
         if config_file.exists():
             try:
                 with open(config_file) as f:

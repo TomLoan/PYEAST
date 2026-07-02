@@ -24,7 +24,7 @@ uv tool install git+https://github.com/TomLoan/PYEAST.git
 pyeast init
 ```
 
-`pyeast init` clones the [data repository](https://github.com/TomLoan/PYEAST_data) to `~/.pyeast/data-repo/` and configures PYEAST automatically. If you have already downloaded the data elsewhere, point PYEAST at it instead:
+`pyeast init` clones the [data repository](https://github.com/TomLoan/PYEAST_data) to `~/PYEAST/data/` and configures PYEAST automatically. If you have already downloaded the data elsewhere, point PYEAST at it instead:
 
 ```bash
 pyeast init --data-dir /path/to/PYEAST_data
@@ -127,7 +127,7 @@ When you run `pyeast init`, the `private/` folder structure is created automatic
 PYEAST looks for data in this order:
 
 1. Environment variable: `PYEAST_DATA_DIR`
-2. Config file: `~/.pyeast/config.yaml`
+2. Config file: `~/PYEAST/config.yaml`
 3. Default: `~/PYEAST/data/`
 
 To view or update your current configuration, run `pyeast init`.

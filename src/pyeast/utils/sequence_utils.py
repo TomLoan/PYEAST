@@ -217,7 +217,11 @@ def parse_gb_file(file_path: str) -> tuple[SeqRecord, list[SeqRecord]]:
     plasmid = SeqIO.read(file_path, "genbank")
     parts = []
     for feature in plasmid.features:
-        if feature.type == "misc_feature":
+        if feature.type == "PYEAST_component":
+            part_name = feature.qualifiers.get("label", [f"Part_{len(parts)}"])[0]
+            part_seq = feature.extract(plasmid.seq)
+            parts.append(SeqRecord(part_seq, id=part_name, name=part_name, description=""))
+        elif feature.type == "misc_feature" and "PYEAST_component" not in [f.type for f in plasmid.features]:
             part_name = feature.qualifiers.get("label", [f"Part_{len(parts)}"])[0]
             part_seq = feature.extract(plasmid.seq)
             parts.append(SeqRecord(part_seq, id=part_name, name=part_name, description=""))
@@ -388,7 +392,7 @@ def assemble_parts_circular(parts: list[SeqRecord], primers: dict[str, Seq], hom
         part_length = len(part.seq)
         part_feature = SeqFeature(
             FeatureLocation(current_position, current_position + part_length),
-            type="misc_feature",
+            type="PYEAST_component",
             qualifiers={"label": f"{part.id}_{i}"}  # Add index to make labels unique
         )
         features.append(part_feature)

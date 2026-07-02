@@ -31,7 +31,15 @@ class LLMProvider:
 
 class AnthropicProvider(LLMProvider):
     def __init__(self, model: str):
-        import anthropic
+        try:
+            import anthropic
+        except ModuleNotFoundError:
+            print(
+                "Error: the 'anthropic' package is required for the default (Anthropic) provider.\n"
+                "Install it with the agent extra:  pip install 'pyeast[agent]'  (or  uv tool install 'pyeast[agent]')\n"
+                "Alternatively, use a provider that needs no extra dependency, e.g. --provider openai or --provider ollama."
+            )
+            sys.exit(1)
 
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:

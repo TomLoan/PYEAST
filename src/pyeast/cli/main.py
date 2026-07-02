@@ -49,7 +49,7 @@ from pyeast.utils.visualisation import save_figure, visualise_genbank
 console = Console()
 
 DATA_REPO_URL = "https://github.com/TomLoan/PYEAST_data.git"
-_DATA_REPO_CLONE_DIR = Path.home() / ".pyeast" / "data-repo"
+_DATA_REPO_CLONE_DIR = Path.home() / "PYEAST" / "data"
 
 
 def get_output_prefix() -> Path:
@@ -147,6 +147,16 @@ def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> 
         output_prefix: Path prefix for output files (same as human instructions)
     """
     session = PromptSession()
+
+    missing_primer_count = len(getattr(designer, "missing_primers", {}) or {})
+    missing_template_count = sum(
+        1 for row in getattr(designer, "human_instructions", [])[1:] if row[9] == "Not found"
+    )
+    if missing_primer_count or missing_template_count:
+        console.print(
+            f"[yellow]Note: {missing_primer_count} primer(s) and {missing_template_count} "
+            "template(s) not found - these will need to be ordered or sourced manually.[/yellow]"
+        )
 
     if click.confirm("\nWould you like to generate machine instructions for liquid handling?"):
         machines = ['epMotion', 'Janus', 'Hamilton']
@@ -1182,9 +1192,9 @@ def run_gg_interactive_mode(designer: ggDesigner):
         console.print("\n[yellow]Operation cancelled[/yellow]")
 
 def _write_config(data_dir: Path, output_dir) -> None:
-    """Write ~/.pyeast/config.yaml with the given data and optional output paths."""
+    """Write ~/PYEAST/config.yaml with the given data and optional output paths."""
     import yaml
-    config_file = Path.home() / ".pyeast" / "config.yaml"
+    config_file = Path.home() / "PYEAST" / "config.yaml"
     config_file.parent.mkdir(parents=True, exist_ok=True)
     config_data = {'data_dir': str(data_dir)}
     if output_dir:
@@ -1194,7 +1204,7 @@ def _write_config(data_dir: Path, output_dir) -> None:
 
 
 def _clone_data_repo(subprocess) -> None:
-    """Clone the PYEAST data repository to ~/.pyeast/data-repo/ and write config."""
+    """Clone the PYEAST data repository to ~/PYEAST/data/ and write config."""
     clone_dir = _DATA_REPO_CLONE_DIR
 
     if clone_dir.exists():
@@ -1216,7 +1226,7 @@ def _clone_data_repo(subprocess) -> None:
     _write_config(clone_dir, None)
     console.print(f"[green]Data repository cloned to {clone_dir}[/green]")
     console.print(f"[green]Configured PYEAST to use data at {clone_dir}[/green]")
-    console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
+    console.print(f"[dim]Config saved to: {Path.home() / 'PYEAST' / 'config.yaml'}[/dim]")
 
 
 @click.group()
@@ -1232,7 +1242,7 @@ def cli():
 def init(data_dir, output_dir):
     """Initialize PYEAST data directory configuration.
 
-    Without --data-dir: clones the PYEAST data repository to ~/.pyeast/data-repo/
+    Without --data-dir: clones the PYEAST data repository to ~/PYEAST/data/
     automatically, or shows current configuration if already set up.
 
     With --data-dir: registers an existing data directory.
@@ -1265,7 +1275,7 @@ def init(data_dir, output_dir):
         console.print(f"[green]Configured PYEAST to use data at {target}[/green]")
         if output_dir:
             console.print(f"[green]Output directory set to {output_dir}[/green]")
-        console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
+        console.print(f"[dim]Config saved to: {Path.home() / 'PYEAST' / 'config.yaml'}[/dim]")
         return
 
     # No --data-dir provided
@@ -1291,7 +1301,7 @@ def init(data_dir, output_dir):
                 raise click.Abort()
             _write_config(target.resolve(), None)
             console.print(f"[green]Configured PYEAST to use data at {target}[/green]")
-            console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
+            console.print(f"[dim]Config saved to: {Path.home() / 'PYEAST' / 'config.yaml'}[/dim]")
             return
 
         if choice == "3":
@@ -1299,7 +1309,7 @@ def init(data_dir, output_dir):
             output_path = Path(new_output)
             _write_config(config.data_dir, output_path.resolve())
             console.print(f"[green]Output directory set to {output_path}[/green]")
-            console.print(f"[dim]Config saved to: {Path.home() / '.pyeast' / 'config.yaml'}[/dim]")
+            console.print(f"[dim]Config saved to: {Path.home() / 'PYEAST' / 'config.yaml'}[/dim]")
             return
 
         # choice == "2" falls through to clone logic below

@@ -46,8 +46,8 @@ jobs:
 
       - name: Set up PYEAST data repo for integration tests
         run: |
-          git clone https://github.com/TomLoan/PYEAST_data.git ~/.pyeast/data-repo
-          uv run pyeast init --data-dir ~/.pyeast/data-repo
+          git clone https://github.com/TomLoan/PYEAST_data.git ~/PYEAST/data
+          uv run pyeast init --data-dir ~/PYEAST/data
 
       - name: Run test suite
         run: |
