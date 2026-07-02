@@ -209,7 +209,7 @@ class BatchDesigner:
 
         Checks that each construct:
         - Has a topology annotation
-        - Has at least one part (misc_feature)
+        - Has at least one part (PYEAST_component or misc_feature)
         - Each part has proper primer annotations:
             - Forward primer at start (strand=1)
             - Reverse primer at end (strand=-1)
@@ -232,7 +232,8 @@ class BatchDesigner:
             is_circular = record.annotations['topology'].lower() == 'circular'
 
             # Get parts
-            parts = [f for f in record.features if f.type == "misc_feature"]
+            pyeast_parts = [f for f in record.features if f.type == "PYEAST_component"]
+            parts = pyeast_parts if pyeast_parts else [f for f in record.features if f.type == "misc_feature"]
             if not parts:
                 self.validation_errors.append(f"{name}: No parts (misc_feature) found")
                 continue
@@ -307,7 +308,22 @@ class BatchDesigner:
 
         # First extract all components
         for feature in record.features:
-            if feature.type == "misc_feature":
+            if feature.type == "PYEAST_component":
+                if "label" not in feature.qualifiers:
+                    raise ValueError(f"Component at position {feature.location} missing label")
+
+                component_seq = feature.extract(record.seq)
+                component = {
+                    'name': feature.qualifiers['label'][0],
+                    'sequence': str(component_seq),
+                    'start': int(feature.location.start),
+                    'end': int(feature.location.end),
+                    'forward_primer': None,
+                    'reverse_primer': None
+                }
+                components.append(component)
+
+            elif feature.type == "misc_feature" and not ('PYEAST_component' in [f.type for f in record.features]):
                 if "label" not in feature.qualifiers:
                     raise ValueError(f"Component at position {feature.location} missing label")
 
@@ -323,7 +339,7 @@ class BatchDesigner:
                 components.append(component)
 
         if not components:
-            raise ValueError("No components (misc_features) found in record")
+            raise ValueError("No components (PYEAST_component or misc_features) found in record")
 
         # Sort components by position
         components.sort(key=lambda x: x['start'])
@@ -1336,7 +1352,10 @@ class BatchDesigner:
             topology = record.annotations.get('topology', '').lower()
 
             # Count components
-            component_count = sum(1 for f in record.features if f.type == "misc_feature")
+            if 'PYEAST_component' in [f.type for f in record.features]:
+                component_count = sum(1 for f in record.features if f.type == "PYEAST_component")
+            else:
+                component_count = sum(1 for f in record.features if f.type == "misc_feature")
 
             input_data.append([
                 name,
