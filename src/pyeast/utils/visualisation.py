@@ -55,8 +55,8 @@ def visualise_genbank(gb_file_path):
 
     # Define your organization's color palette
     color_palette = [
-        "#6468D8", "#2F5879", "#5E4661", "#578385", "#5E867A", "#D482B6",
-        "#DDA87F", "#F5D99E", "#CFD7F5", "#9FE9BF", "#ACD37D", "#94E1E6"
+        "#6468D8", "#2F5879", "#5E4661", "#578385", "#A17179", "#D482B6",
+        "#DDA87F", "#F5D99E", "#BAC4E6", "#9FE9BF", "#ACD37D", "#94E1E6"
     ]
     color_cycle = itertools.cycle(color_palette)
 
