@@ -36,6 +36,8 @@ import matplotlib.pyplot as plt
 from Bio import SeqIO
 from dna_features_viewer import CircularGraphicRecord, GraphicFeature, GraphicRecord
 
+from pyeast.utils.sequence_utils import is_pyeast_component
+
 
 def visualise_genbank(gb_file_path):
     """
@@ -61,7 +63,7 @@ def visualise_genbank(gb_file_path):
     color_cycle = itertools.cycle(color_palette)
 
     for feature in record.features:
-        if feature.type in ["PYEAST_component", "misc_feature"]:
+        if is_pyeast_component(feature):
             start = int(feature.location.start)
             end = int(feature.location.end)
             strand = feature.location.strand

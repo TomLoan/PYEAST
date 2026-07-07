@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 from pyeast.utils.path_utils import get_output_path, get_primers_path, get_templates_path
 from pyeast.utils.primer_utils import get_primer_locations, rationalize_primers
-from pyeast.utils.sequence_utils import get_templates, rationalize_templates
+from pyeast.utils.sequence_utils import get_component_features, get_templates, rationalize_templates
 
 
 class BatchDesigner:
@@ -231,9 +231,8 @@ class BatchDesigner:
 
             is_circular = record.annotations['topology'].lower() == 'circular'
 
-            # Get parts
-            pyeast_parts = [f for f in record.features if f.type == "PYEAST_component"]
-            parts = pyeast_parts if pyeast_parts else [f for f in record.features if f.type == "misc_feature"]
+            # Get parts (PYEAST-marked components, or bare misc_features for legacy files)
+            parts = get_component_features(record)
             if not parts:
                 self.validation_errors.append(f"{name}: No parts (misc_feature) found")
                 continue
@@ -306,37 +305,21 @@ class BatchDesigner:
         """Extract component and primer information from GenBank annotations."""
         components = []
 
-        # First extract all components
-        for feature in record.features:
-            if feature.type == "PYEAST_component":
-                if "label" not in feature.qualifiers:
-                    raise ValueError(f"Component at position {feature.location} missing label")
+        # First extract all components (PYEAST-marked, or bare misc_features for legacy files)
+        for feature in get_component_features(record):
+            if "label" not in feature.qualifiers:
+                raise ValueError(f"Component at position {feature.location} missing label")
 
-                component_seq = feature.extract(record.seq)
-                component = {
-                    'name': feature.qualifiers['label'][0],
-                    'sequence': str(component_seq),
-                    'start': int(feature.location.start),
-                    'end': int(feature.location.end),
-                    'forward_primer': None,
-                    'reverse_primer': None
-                }
-                components.append(component)
-
-            elif feature.type == "misc_feature" and not ('PYEAST_component' in [f.type for f in record.features]):
-                if "label" not in feature.qualifiers:
-                    raise ValueError(f"Component at position {feature.location} missing label")
-
-                component_seq = feature.extract(record.seq)
-                component = {
-                    'name': feature.qualifiers['label'][0],
-                    'sequence': str(component_seq),
-                    'start': int(feature.location.start),
-                    'end': int(feature.location.end),
-                    'forward_primer': None,
-                    'reverse_primer': None
-                }
-                components.append(component)
+            component_seq = feature.extract(record.seq)
+            component = {
+                'name': feature.qualifiers['label'][0],
+                'sequence': str(component_seq),
+                'start': int(feature.location.start),
+                'end': int(feature.location.end),
+                'forward_primer': None,
+                'reverse_primer': None
+            }
+            components.append(component)
 
         if not components:
             raise ValueError("No components (PYEAST_component or misc_features) found in record")
@@ -1352,10 +1335,7 @@ class BatchDesigner:
             topology = record.annotations.get('topology', '').lower()
 
             # Count components
-            if 'PYEAST_component' in [f.type for f in record.features]:
-                component_count = sum(1 for f in record.features if f.type == "PYEAST_component")
-            else:
-                component_count = sum(1 for f in record.features if f.type == "misc_feature")
+            component_count = len(get_component_features(record))
 
             input_data.append([
                 name,

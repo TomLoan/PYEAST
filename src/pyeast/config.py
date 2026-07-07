@@ -21,6 +21,21 @@ class PyeastConfig:
         """Initialize configuration by resolving paths in priority order."""
         self.data_dir = self._resolve_data_dir()
         self.output_dir = self._resolve_output_dir()
+        self.preferred_templates = self._resolve_preferred_templates()
+
+    def _resolve_preferred_templates(self) -> list:
+        """Resolve the preferred-templates list from the config file.
+
+        When a part is found in several templates, these are preferred (matched against the
+        template record name inside the .gb, not the filename or part name). Empty by default,
+        in which case the shortest-matching-template sorter alone decides.
+        """
+        config_data = self._load_config_file()
+        if config_data and 'preferred_templates' in config_data:
+            value = config_data['preferred_templates']
+            if isinstance(value, list):
+                return value
+        return []
 
     def _resolve_data_dir(self) -> Path:
         """Resolve data directory location.

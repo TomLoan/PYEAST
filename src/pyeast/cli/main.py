@@ -40,10 +40,11 @@ from tabulate import tabulate
 from pyeast.core.batch import BatchDesigner
 from pyeast.core.deletion import DeletionDesigner
 from pyeast.core.gg import ggDesigner
-from pyeast.core.integration import IntegrationDesigner
+from pyeast.core.integration import IntegrationDesigner, IntegrationResult
 from pyeast.core.replace import ReplaceDesigner
-from pyeast.core.tar import TARDesigner
+from pyeast.core.tar import TARDesigner, TARResult
 from pyeast.utils.path_utils import ensure_output_dir_exists, get_component_libraries_path, get_primers_path, get_templates_path
+from pyeast.utils.sequence_utils import get_component_features
 from pyeast.utils.visualisation import save_figure, visualise_genbank
 
 console = Console()
@@ -288,8 +289,7 @@ def print_construct_grid(available_constructs: dict) -> None:
         source_type = record.annotations.get('source_type', 'unknown')
         components = [
             feature.qualifiers.get("label", ["Unlabeled"])[0]
-            for feature in record.features
-            if feature.type == "misc_feature"
+            for feature in get_component_features(record)
         ]
         component_str = ", ".join(components)
         if len(component_str) > 120:
@@ -521,6 +521,65 @@ def display_instructions(instructions: list[list[str]]):
     console.print(table)
 
 
+def display_assembly_diagnostics(diagnostics: list, specificity: list, notes: list) -> None:
+    """Render the pydna ambiguity diagnostic, PCR-specificity notes, and build notes.
+
+    Advisory only - nothing here blocks a design; it surfaces recombination ambiguity
+    (accidental part reuse / shared homology), likely PCR off-targets, and any template
+    fallbacks taken while building amplicons.
+    """
+    # Amplicon-build fallbacks (dummy template / constructed / truncated assembly).
+    for note in notes or []:
+        kind = note.get("kind", "")
+        style = "yellow" if kind in ("truncated", "no_product", "constructed") else "dim"
+        console.print(f"[{style}]note: {note.get('message', '')}[/{style}]")
+
+    # PCR specificity (soft off-target warnings).
+    if specificity:
+        console.print("\n[yellow]PCR specificity - possible off-target amplification:[/yellow]")
+        for w in specificity:
+            console.print(f"  - {w['message']}")
+
+    # Ambiguity diagnostic.
+    if diagnostics:
+        console.print("\n[bold yellow]Assembly ambiguity detected[/bold yellow] "
+                      "(a fragment shares homology with more than its two neighbours):")
+        for f in diagnostics:
+            partners = ", ".join(f["partners"])
+            console.print(f"  - [cyan]{f['part']}[/cyan] overlaps: {partners}")
+            for ov in f.get("overlaps", [])[:4]:
+                console.print(f"      {ov['kind']} overlap at {ov['location']} "
+                              f"with {ov['partner']}")
+        console.print("[dim]This usually means an accidentally reused part or shared/internal "
+                      "homology. It can be intentional (repeats are sometimes unavoidable).[/dim]")
+    else:
+        console.print("[green]Assembly diagnostic clean - every fragment overlaps exactly "
+                      "its two neighbours.[/green]")
+
+
+def prompt_ambiguity_choice(repick_label: str) -> str:
+    """Ask how to proceed on an ambiguous assembly, using the tool's autocomplete convention.
+
+    Prints the options as a list then reads one back via WordCompleter (matching
+    get_tar_assembly_order / get_integration_selections), avoiding Rich markup pitfalls.
+
+    Returns one of: "proceed", "re-pick", "cancel".
+    """
+    options = ["proceed", "re-pick", "cancel"]
+    console.print("\n[yellow]How would you like to proceed?[/yellow]")
+    console.print("  proceed  - assemble anyway")
+    console.print(f"  re-pick  - {repick_label}")
+    console.print("  cancel   - abort this design")
+
+    session = PromptSession()
+    completer = WordCompleter(options, ignore_case=True)
+    while True:
+        choice = session.prompt("Choice: ", completer=completer).strip().lower()
+        if choice in options:
+            return choice
+        console.print(f"[red]Please choose one of: {', '.join(options)}[/red]")
+
+
 def get_tar_assembly_order(sequences: dict) -> list[str] | None:
     """Interactively get the TAR assembly order from the user with autocomplete."""
     session = PromptSession()
@@ -640,22 +699,61 @@ def run_tar_interactive_mode(designer: TARDesigner):
         if not assembly_order:
             return
 
-        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
-            task_id = progress.add_task("Designing...", total=None)
-            result = designer.design(
-                library_path=components_dir,
-                assembly_order=assembly_order,
-                primer_folder=get_primers_path(),
-                template_folder=get_templates_path(),
-                name="assembly",
+        # Design + diagnose, then let the user act on any ambiguity before committing to
+        # the (potentially expensive) recombination enumeration.
+        proceed_on_ambiguity = False
+        while True:
+            with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
+                task_id = progress.add_task("Designing...", total=None)
+                designer.set_assembly_order(assembly_order)
+                designer.design_tar_primers()
+                designer.check_primer_locations(get_primers_path())
+                designer.find_templates(get_templates_path())
+                designer.rationalize_selections()
+                instructions = designer.write_instructions()
+                designer.diagnose()
+                progress.update(task_id, completed=True)
+
+            display_instructions(instructions)
+            display_assembly_diagnostics(
+                designer.diagnostics, designer.specificity, designer.assembly_notes
             )
+
+            if designer.diagnostics:
+                choice = prompt_ambiguity_choice("choose the assembly order again")
+                if choice == "cancel":
+                    console.print("[yellow]Design cancelled[/yellow]")
+                    return
+                if choice == "re-pick":
+                    new_order = get_tar_assembly_order(sequences)
+                    if not new_order:
+                        return
+                    assembly_order = new_order
+                    continue
+                proceed_on_ambiguity = True
+            else:
+                if not click.confirm("\nProceed with assembly?"):
+                    console.print("[yellow]Design cancelled[/yellow]")
+                    return
+            break
+
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
+            task_id = progress.add_task("Assembling...", total=None)
+            assembly = designer.create_assembly(proceed_on_ambiguity=proceed_on_ambiguity)
             progress.update(task_id, completed=True)
 
-        display_instructions(result.instructions)
-
-        if not click.confirm("\nProceed with assembly?"):
-            console.print("[yellow]Design cancelled[/yellow]")
-            return
+        result = TARResult(
+            name="assembly",
+            assembly=assembly,
+            primers=designer.primers,
+            instructions=instructions,
+            missing_primers=designer.missing_primers,
+            diagnostics=designer.diagnostics,
+            specificity=designer.specificity,
+            notes=designer.assembly_notes,
+            provenance=designer.provenance,
+            history=designer.history,
+        )
 
         output_prefix = get_output_prefix()
         result.assembly.name = output_prefix.name
@@ -677,6 +775,8 @@ def run_tar_interactive_mode(designer: TARDesigner):
                 console.print(f"[green]All primers: {output_prefix}_all_primers.tsv[/green]")
                 if result.missing_primers:
                     console.print(f"[green]Missing primers: {output_prefix}_missing_primers.tsv[/green]")
+                if result.history:
+                    console.print(f"[green]Cloning history: {output_prefix}_history.json[/green]")
 
                 img = Image.open(io.BytesIO(img_data.getvalue()))
                 img.show()
@@ -712,23 +812,59 @@ def run_integration_interactive_mode(designer: IntegrationDesigner):
             return
         assembly_order, integration_site_name = selections
 
-        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
-            task_id = progress.add_task("Designing...", total=None)
-            result = designer.design(
-                components_dir=components_dir,
-                assembly_order=assembly_order,
-                integration_site_name=integration_site_name,
-                primer_folder=get_primers_path(),
-                template_folder=get_templates_path(),
-                name="assembly",
+        proceed_on_ambiguity = False
+        while True:
+            with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
+                task_id = progress.add_task("Designing...", total=None)
+                designer.set_assembly_order(assembly_order, integration_site_name)
+                designer.design_integration_primers()
+                designer.check_primer_locations(get_primers_path())
+                designer.find_templates(get_templates_path())
+                designer.rationalize_selections()
+                instructions = designer.write_instructions()
+                designer.diagnose()
+                progress.update(task_id, completed=True)
+
+            display_instructions(instructions)
+            display_assembly_diagnostics(
+                designer.diagnostics, designer.specificity, designer.assembly_notes
             )
+
+            if designer.diagnostics:
+                choice = prompt_ambiguity_choice("choose the components / integration site again")
+                if choice == "cancel":
+                    console.print("[yellow]Design cancelled[/yellow]")
+                    return
+                if choice == "re-pick":
+                    new_selections = get_integration_selections(designer.components, designer.int_sites)
+                    if not new_selections:
+                        return
+                    assembly_order, integration_site_name = new_selections
+                    continue
+                proceed_on_ambiguity = True
+            else:
+                if not click.confirm("\nProceed with assembly?"):
+                    console.print("[yellow]Design cancelled[/yellow]")
+                    return
+            break
+
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
+            task_id = progress.add_task("Assembling...", total=None)
+            assembly = designer.create_linear_assembly(proceed_on_ambiguity=proceed_on_ambiguity)
             progress.update(task_id, completed=True)
 
-        display_instructions(result.instructions)
-
-        if not click.confirm("\nProceed with assembly?"):
-            console.print("[yellow]Design cancelled[/yellow]")
-            return
+        result = IntegrationResult(
+            name="assembly",
+            assembly=assembly,
+            primers=designer.primers,
+            instructions=instructions,
+            missing_primers=designer.missing_primers,
+            diagnostics=designer.diagnostics,
+            specificity=designer.specificity,
+            notes=designer.assembly_notes,
+            provenance=designer.provenance,
+            history=designer.history,
+        )
 
         output_prefix = get_output_prefix()
         result.assembly.name = output_prefix.name
@@ -750,6 +886,8 @@ def run_integration_interactive_mode(designer: IntegrationDesigner):
                 console.print(f"[green]All primers: {output_prefix}_all_primers.tsv[/green]")
                 if result.missing_primers:
                     console.print(f"[green]Missing primers: {output_prefix}_missing_primers.tsv[/green]")
+                if result.history:
+                    console.print(f"[green]Cloning history: {output_prefix}_history.json[/green]")
 
                 img = Image.open(io.BytesIO(img_data.getvalue()))
                 img.show()
@@ -1192,15 +1330,37 @@ def run_gg_interactive_mode(designer: ggDesigner):
         console.print("\n[yellow]Operation cancelled[/yellow]")
 
 def _write_config(data_dir: Path, output_dir) -> None:
-    """Write ~/PYEAST/config.yaml with the given data and optional output paths."""
+    """Write ~/PYEAST/config.yaml with the given data and optional output paths.
+
+    Preserves any existing ``preferred_templates`` list across reconfigures and scaffolds it
+    (empty) with an explanatory comment on first write.
+    """
     import yaml
     config_file = Path.home() / "PYEAST" / "config.yaml"
     config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Preserve an existing preferred_templates list so reconfiguring does not clobber it.
+    preferred: list = []
+    if config_file.exists():
+        try:
+            existing = yaml.safe_load(config_file.read_text()) or {}
+            if isinstance(existing.get('preferred_templates'), list):
+                preferred = existing['preferred_templates']
+        except (OSError, yaml.YAMLError):
+            pass
+
     config_data = {'data_dir': str(data_dir)}
     if output_dir:
         config_data['output_dir'] = str(output_dir)
     with open(config_file, 'w') as f:
         yaml.dump(config_data, f)
+        f.write(
+            "\n"
+            "# preferred_templates: when a part is found in several templates, prefer these.\n"
+            "# Use the template record name (inside the .gb, e.g. pUC19), not the filename or\n"
+            '# part name. Format: ["pUC19", "pRG205MX"]. Empty = use shortest match.\n'
+        )
+        yaml.dump({'preferred_templates': preferred}, f)
 
 
 def _clone_data_repo(subprocess) -> None:

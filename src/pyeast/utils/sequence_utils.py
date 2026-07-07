@@ -26,17 +26,47 @@ Sequence utilities for PYEAST.
 import logging
 import os
 from collections import Counter
-from collections.abc import Generator
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from Bio import Align, SeqIO
+from Bio import SeqIO
 from Bio.Seq import Seq
-from Bio.SeqFeature import CompoundLocation, FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
 
 from .path_utils import get_private_equivalent
+
+# Marker recorded in a feature's /note qualifier to identify a PYEAST component part.
+# The feature type itself is the standard "misc_feature" so the annotation survives
+# round-trips through GenBank tools (SnapGene / Geneious / OpenCloning) that coerce
+# non-standard feature keys. Constructs written before the changeover used a custom
+# type="PYEAST_component"; that is still recognised for backward compatibility.
+PYEAST_COMPONENT_NOTE = "PYEAST_component"
+
+
+def is_pyeast_component(feature) -> bool:
+    """True if a SeqFeature marks a PYEAST component part.
+
+    Recognises the current form (type="misc_feature" carrying a /note="PYEAST_component"
+    marker) and the legacy form (custom type="PYEAST_component").
+    """
+    if feature.type == "PYEAST_component":
+        return True
+    return PYEAST_COMPONENT_NOTE in feature.qualifiers.get("note", [])
+
+
+def get_component_features(record) -> list:
+    """Return a record's PYEAST component features, most-preferred detection first.
+
+    Prefers features carrying the PYEAST marker (new note-marked misc_feature, or the
+    legacy custom type). Only when a record has no marked components does it fall back to
+    treating every bare ``misc_feature`` as a component - the legacy path for externally
+    supplied GenBank files that predate the marker. This keeps template-derived
+    misc_features (which now flow through into outputs) from being mistaken for parts.
+    """
+    marked = [f for f in record.features if is_pyeast_component(f)]
+    if marked:
+        return marked
+    return [f for f in record.features if f.type == "misc_feature"]
 
 
 def load_sequences(directory: str) -> dict[str, SeqRecord]:
@@ -160,7 +190,8 @@ def get_templates(parts: list[SeqRecord], directory: str) -> dict[str, list[str]
 
     return templates_used
 
-def rationalize_templates(template_dict: dict[str, list[str]]) -> dict[str, str]:
+def rationalize_templates(template_dict: dict[str, list[str]],
+                          preferred_templates: Optional[list[str]] = None) -> dict[str, str]:
     """
     Rationalize template selection to minimize the number of unique templates.
 
@@ -171,12 +202,17 @@ def rationalize_templates(template_dict: dict[str, list[str]]) -> dict[str, str]
 
     Args:
         template_dict (Dict[str, List[str]]): A dictionary mapping part names to lists of potential templates.
+        preferred_templates (Optional[List[str]]): Templates to prefer when a part matches
+            several. Matched against the template record name. When None, the list is read
+            from the user config (empty by default, so the shortest-match sorter decides).
 
     Returns:
         Dict[str, str]: A dictionary mapping part names to their choseninput template.
     """
-    # Define a list of preferred templates
-    preferred_templates = ['pUC19', 'pYES2', 'pESC-TRP', ]  # Add more as needed
+    # Load the preferred list from config unless one was passed explicitly.
+    if preferred_templates is None:
+        from pyeast.config import get_config
+        preferred_templates = get_config().preferred_templates
 
     # Count the global frequency of each template
 
@@ -216,15 +252,10 @@ def parse_gb_file(file_path: str) -> tuple[SeqRecord, list[SeqRecord]]:
     """
     plasmid = SeqIO.read(file_path, "genbank")
     parts = []
-    for feature in plasmid.features:
-        if feature.type == "PYEAST_component":
-            part_name = feature.qualifiers.get("label", [f"Part_{len(parts)}"])[0]
-            part_seq = feature.extract(plasmid.seq)
-            parts.append(SeqRecord(part_seq, id=part_name, name=part_name, description=""))
-        elif feature.type == "misc_feature" and "PYEAST_component" not in [f.type for f in plasmid.features]:
-            part_name = feature.qualifiers.get("label", [f"Part_{len(parts)}"])[0]
-            part_seq = feature.extract(plasmid.seq)
-            parts.append(SeqRecord(part_seq, id=part_name, name=part_name, description=""))
+    for feature in get_component_features(plasmid):
+        part_name = feature.qualifiers.get("label", [f"Part_{len(parts)}"])[0]
+        part_seq = feature.extract(plasmid.seq)
+        parts.append(SeqRecord(part_seq, id=part_name, name=part_name, description=""))
     return plasmid, parts
 
 def write_circular_instructions(rationalized_primers: dict[str, dict],
@@ -367,225 +398,8 @@ def find_matching_primer(primers: dict[str, dict], part_seq: Seq, is_forward: bo
 
     return None
 
-def assemble_parts_circular(parts: list[SeqRecord], primers: dict[str, Seq], homology_length: int) -> SeqRecord:
-    """
-    Assemble DNA parts using TAR cloning simulation, preserving part information and correctly positioning primers.
-
-    Args:
-        parts (List[SeqRecord]): List of parts to be assembled.
-        primers (Dict[str, Seq]): Dictionary of primers with overhangs.
-        homology_length (int): Length of homology for recombination.
-
-    Returns:
-        SeqRecord: Assembled plasmid as a SeqRecord object with features.
-    """
-    # Assemble the plasmid sequence
-    assembled_sequence = "".join(str(part.seq) for part in parts)
-    total_length = len(assembled_sequence)
-    circular_sequence = assembled_sequence + assembled_sequence[:50]
-
-    features = []
-    current_position = 0
-
-    # Add part features
-    for i, part in enumerate(parts):
-        part_length = len(part.seq)
-        part_feature = SeqFeature(
-            FeatureLocation(current_position, current_position + part_length),
-            type="PYEAST_component",
-            qualifiers={"label": f"{part.id}_{i}"}  # Add index to make labels unique
-        )
-        features.append(part_feature)
-        current_position += part_length
-
-    # Add primer features
-    for primer_name, primer_seq in primers.items():
-        primer_str = str(primer_seq)
-        rc_primer_str = str(Seq(primer_str).reverse_complement())
-
-        # Find all occurrences of the primer in the circular sequence
-        forward_matches = find_all_occurrences(circular_sequence, primer_str)
-        reverse_matches = find_all_occurrences(circular_sequence, rc_primer_str)
-
-        # Add features for all forward matches
-        for match in forward_matches:
-            start = match % total_length
-            end = (start + len(primer_str)) % total_length
-            if start < end:
-                primer_feature = SeqFeature(
-                    FeatureLocation(start, end, strand=1),
-                    type="primer_bind",
-                    qualifiers={"label": f"{primer_name}_forward"}
-                )
-            else:
-                primer_feature = SeqFeature(
-                    CompoundLocation([
-                        FeatureLocation(start, total_length, strand=1),
-                        FeatureLocation(0, end, strand=1)
-                    ]),
-                    type="primer_bind",
-                    qualifiers={"label": f"{primer_name}_forward"}
-                )
-            features.append(primer_feature)
-
-        # Add features for all reverse matches
-        for match in reverse_matches:
-            start = match % total_length
-            end = (start + len(primer_str)) % total_length
-            if start < end:
-                primer_feature = SeqFeature(
-                    FeatureLocation(start, end, strand=-1),
-                    type="primer_bind",
-                    qualifiers={"label": f"{primer_name}_reverse"}
-                )
-            else:
-                primer_feature = SeqFeature(
-                    CompoundLocation([
-                        FeatureLocation(0, end, strand=-1),
-                        FeatureLocation(start, total_length, strand=-1)
-
-                    ]),
-                    type="primer_bind",
-                    qualifiers={"label": f"{primer_name}_reverse"}
-                )
-            features.append(primer_feature)
-
-        if not forward_matches and not reverse_matches:
-            print(f"Warning: Primer {primer_name} not found in the assembled sequence")
-
-    # Check for similar junctions
-    junction_length = 100  # 50 bp on either side of the junction
-    junctions = []
-
-    current_position = 0
-    for i, part in enumerate(parts):
-        part_length = len(part.seq)
-        junction_start = (current_position + part_length - junction_length // 2) % total_length
-        junction_end = (junction_start + junction_length) % total_length
-
-        if junction_start < junction_end:
-            junction_seq = circular_sequence[junction_start:junction_end]
-        else:
-            junction_seq = circular_sequence[junction_start:]
-
-        next_part = parts[(i + 1) % len(parts)]
-        junctions.append((junction_seq, f"{part.id}_{i}", f"{next_part.id}_{(i+1)%len(parts)}"))
-
-        current_position += part_length
-    #print('checking junctions')
-    #print(junctions)
-    # Perform pairwise alignments and check for similarities
-    # print(len(junctions))
-    for i in range(len(junctions)):
-        for j in range(i + 1, len(junctions)):
-            seq1, part1, next_part1 = junctions[i]
-            seq2, part2, next_part2 = junctions[j]
-
-            alignments = Align.PairwiseAligner().align(seq1, seq2)
-            best_alignment = alignments[0]
-            max_possible_score = min(len(seq1), len(seq2))
-            similarity = best_alignment.score / max_possible_score
-            #print(best_alignment)
-            if similarity > 0.8:  # You can adjust this threshold
-                print(f"Warning: High similarity ({similarity:.2f}) between junctions:")
-                print(f"  - {part1} and {next_part1}")
-                print(f"  - {part2} and {next_part2}")
-                print(f"Alignment:\n{best_alignment}")
-
-    # Create a SeqRecord for the assembled plasmid
-    assembled_plasmid = SeqRecord(
-        Seq(assembled_sequence),
-        id="Assembled_Plasmid",
-        name="TAR_Cloned_Plasmid",
-        description="Plasmid assembled by TAR cloning simulation",
-        features=features
-    )
-
-    # Add annotations
-    assembled_plasmid.annotations["molecule_type"] = "DNA"
-    assembled_plasmid.annotations["topology"] = "circular"
-    assembled_plasmid.annotations["date"] = datetime.now().strftime("%d-%b-%Y").upper()
-
-    return assembled_plasmid
-
-def find_all_occurrences(sequence: str, substring: str) -> Generator[int, None, None]:
-    """Find all occurrences of a substring in a sequence."""
-    start = 0
-    while True:
-        start = sequence.find(substring, start)
-        if start == -1:  # Substring not found
-            return
-        yield start
-        start += 1  # Move to next possible position
-
-
-def assemble_parts_linear(parts: list[SeqRecord], primers: dict[str, Seq]) -> SeqRecord:
-    """Assemble parts for integration, add features for components and primers.
-
-    Args:
-        parts: List of all parts in assembly order (including integration sites)
-        primers: Dictionary of primer names and sequences
-
-    Returns:
-        SeqRecord: Assembled sequence with features and primer annotations
-    """
-    # Assemble parts
-    assembled_sequence = SeqRecord(
-        Seq(''.join(str(part.seq) for part in parts)),
-        id="Assembled_Integration_Construct",
-        name="Integration_Construct",
-        description="Assembled sequence for genomic integration"
-    )
-
-    # Add features for each part
-    current_position = 0
-    for i, part in enumerate(parts):
-        part_length = len(part.seq)
-        if i == 0:
-            feature_type = "misc_feature"
-            qualifier = {"label": f"{part.id} (upstream)"}
-        elif i == len(parts) - 1:
-            feature_type = "misc_feature"
-            qualifier = {"label": f"{part.id} (downstream)"}
-        else:
-            feature_type = "misc_feature"
-            qualifier = {"label": part.id}
-
-        feature = SeqFeature(
-            FeatureLocation(current_position, current_position + part_length),
-            type=feature_type,
-            qualifiers=qualifier
-        )
-        assembled_sequence.features.append(feature)
-        current_position += part_length
-
-    # Add primer annotations
-    assembled_seq_str = str(assembled_sequence.seq)
-    for primer_name, primer_seq in primers.items():
-        primer_seq_str = str(primer_seq)
-        forward_pos = assembled_seq_str.find(primer_seq_str)
-        reverse_complement = str(primer_seq.reverse_complement())
-        reverse_pos = assembled_seq_str.find(reverse_complement)
-
-        if forward_pos != -1:
-            primer_feature = SeqFeature(
-                FeatureLocation(forward_pos, forward_pos + len(primer_seq), strand=1),
-                type="primer_bind",
-                qualifiers={"label": primer_name}
-            )
-            assembled_sequence.features.append(primer_feature)
-        elif reverse_pos != -1:
-            primer_feature = SeqFeature(
-                FeatureLocation(reverse_pos, reverse_pos + len(primer_seq), strand=-1),
-                type="primer_bind",
-                qualifiers={"label": primer_name}
-            )
-            assembled_sequence.features.append(primer_feature)
-
-    # Set annotations
-    assembled_sequence.annotations["molecule_type"] = "DNA"
-    assembled_sequence.annotations["topology"] = "linear"
-    assembled_sequence.annotations["date"] = datetime.now().strftime("%d-%b-%Y").upper()
-
-    return assembled_sequence
+# NB: assemble_parts_circular / assemble_parts_linear (blind concatenation + primer
+# annotation) and their find_all_occurrences helper have been removed. Assembly is now a
+# real recombination simulation via pydna - see pyeast.utils.pydna_utils and the
+# create_assembly / create_linear_assembly methods in core/tar.py and core/integration.py.
 

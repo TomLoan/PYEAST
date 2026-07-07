@@ -3403,7 +3403,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=8.0.0" },
     { name = "primer3-py", specifier = ">=2.2.0" },
     { name = "prompt-toolkit", specifier = ">=3.0.0" },
-    { name = "pydna", specifier = ">=5.5.0" },
+    { name = "pydna", specifier = ">=5.5.16" },
     { name = "pyfastcopy", specifier = ">=1.0.3" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "pyyaml", specifier = ">=6.0" },
