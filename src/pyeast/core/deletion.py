@@ -30,7 +30,6 @@ This module provides tools for designing scarless deletion cassettes in S. cerev
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -72,8 +71,8 @@ class DeletionDesigner:
                  upstream_homology_len: int = 300,
                  downstream_homology_len: int = 200,
                  repeat_length: int = 80,
-                 genome_file: Optional[Path] = None,
-                 ura3_file: Optional[Path] = None):
+                 genome_file: Path | None = None,
+                 ura3_file: Path | None = None):
         """Initialize the DeletionDesigner.
 
         Args:
@@ -97,7 +96,7 @@ class DeletionDesigner:
         self.screening_primers = None
         self.product_sizes = None
 
-    def find_target_sequence(self, genome_file: Path, target_seq: str) -> Optional[tuple[str, int, int, str]]:
+    def find_target_sequence(self, genome_file: Path, target_seq: str) -> tuple[str, int, int, str] | None:
         """Locate a target sequence in the genome.
 
         Args:
@@ -279,7 +278,7 @@ class DeletionDesigner:
         self,
         target_sequence: str,
         name: str = "deletion_cassette",
-        genome_location: Optional[tuple] = None,
+        genome_location: tuple | None = None,
     ) -> DeletionResult:
         """Design a deletion cassette programmatically.
 

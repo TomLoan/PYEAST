@@ -1,15 +1,13 @@
 """Unit tests for the pydna adapter and the TAR/integration engine swap."""
 
+import json
+import random
 from pathlib import Path
 
-import pytest
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
-
-import json
-import random
 
 from pyeast.core.tar import TARDesigner
 from pyeast.utils.primer_utils import design_circular_primers

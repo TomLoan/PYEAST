@@ -3,7 +3,7 @@ name = "pyeast"
 dynamic = ["version"]
 description = "A Python toolkit for yeast engineering"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "GPL-2.0-only"
 license-files = ["LICENSE.txt"]
 authors = [
@@ -11,20 +11,15 @@ authors = [
 ]
 keywords = ["yeast", "synthetic-biology", "cloning", "primer-design", "bioinformatics", "TAR", "golden-gate"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
     "Environment :: Console",
 ]
 
 dependencies = [
-    "loguru>=0.5.3",
-    "pyfastcopy>=1.0.3",
-    "python-dotenv>=1.0.1",
     "click>=8.0.0",
     "rich>=10.0.0",
     "prompt_toolkit>=3.0.0",
@@ -42,7 +37,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-agent = ["anthropic>=0.50.0"]
+agent = ["anthropic>=0.50.0", "python-dotenv>=1.0.1"]
 
 [project.urls]
 Homepage = "https://github.com/TomLoan/PYEAST"
@@ -60,7 +55,7 @@ path = "src/pyeast/__init__.py"
 packages = ["src/pyeast"]
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src/pyeast", "README.md", "LICENSE.txt", "COPYRIGHT.txt", "CONTRIBUTING.md"]
+only-include = ["src/pyeast", "README.md", "CHANGELOG.md", "LICENSE.txt", "COPYRIGHT.txt", "CONTRIBUTING.md"]
 
 [tool.uv]
 package = true
@@ -134,7 +129,7 @@ _sphinx = { cmd = "sphinx-build -b html docs/source docs/build" }
 # Config for various pre-commit checks are below
 # Ruff linting rules - see https://github.com/charliermarsh/ruff and https://beta.ruff.rs/docs/rules/
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 150
 
 

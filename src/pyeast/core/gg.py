@@ -30,14 +30,13 @@ Level 1 golden gate assemblies using the yeast Moclo standard from Lee et al 201
 
 import csv
 import logging
-from pathlib import Path
-from typing import Optional
 import warnings
+from pathlib import Path
+
 import dnacauldron as dc
 import openpyxl
 import pandas as pd
 from Bio import BiopythonDeprecationWarning, SeqIO
-from Bio.SeqRecord import SeqRecord
 
 from pyeast.utils.path_utils import get_private_equivalent, get_templates_path
 from pyeast.utils.sequence_utils import get_templates, load_sequences
@@ -52,7 +51,7 @@ class ggDesigner:
     """
 
     def __init__(self,
-                 template_folder: Optional[Path] = None,
+                 template_folder: Path | None = None,
                  instruments: list = ['Janus', 'epMotion', 'Hamilton', 'Human'],
                  is_library: bool = False
                  ):
@@ -182,18 +181,18 @@ class ggDesigner:
             except Exception as e:
                 logger.warning(f"Could not read {plasmid_file}: {str(e)}")
                 continue
-        
+
         # check for missing mappings
         missing_parts = all_part_names - set(part_to_plasmid.keys())
 
         if missing_parts:
             logger.error(f"Could not find plasmid containing: {', '.join(missing_parts)}")
             raise RuntimeError(f"Parts not found in any plasmids: {missing_parts}")
-        
+
 
         # Get unique plasmid names for assembly
         required_plasmids = list(set(part_to_plasmid.values()))
-        
+
         # Store results
         self.part_to_plasmid_mapping = part_to_plasmid
         self.plasmid_names = required_plasmids
@@ -229,7 +228,7 @@ class ggDesigner:
             RuntimeError: If assembly simulation fails or produces unexpected results
         """
         from pathlib import Path
-        
+
 
         # Construct both public and private plasmid paths
         public_plasmids = self.gg_plasmids
@@ -239,7 +238,7 @@ class ggDesigner:
             private_plasmids = Path("data/private") / relative_path
         except ValueError:
             private_plasmids = Path("data/private") / public_plasmids.name
-        
+
         # Create repository and load records from both locations
         repository = dc.SequenceRepository()
 
@@ -267,8 +266,8 @@ class ggDesigner:
                 )
 
         self.repository = repository
-        
-        
+
+
         # Create Type 2 restriction assembly with the required plasmids
         assembly = dc.Type2sRestrictionAssembly(
             parts=self.plasmid_names,
@@ -277,12 +276,12 @@ class ggDesigner:
             max_constructs=len(self.assemblies_names) + 1
         )
         self.assembly = assembly
-        
+
         simulation = assembly.simulate(sequence_repository=repository)
         self.assembly_sim = simulation
 
         self._validate_assembly_results(simulation, assembly)
-        
+
         return simulation
 
 
@@ -487,7 +486,7 @@ class ggDesigner:
 
 
 
-    def _get_template_position(self, template_name: str) -> tuple[Optional[str], Optional[str]]:
+    def _get_template_position(self, template_name: str) -> tuple[str | None, str | None]:
         """Find the plate and well position for a given template.
 
         First checks if the template is a contig/chromosome in the genome mapping file,

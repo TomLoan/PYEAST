@@ -47,7 +47,6 @@ There are two independent "limit" parameters and they must never be conflated:
 
 from __future__ import annotations
 
-import json
 import os
 from collections import defaultdict
 from datetime import datetime
@@ -58,7 +57,6 @@ from Bio.Seq import Seq
 from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqUtils import MeltingTemp as mt
-
 from pydna.amplify import Anneal
 from pydna.assembly2 import Assembly, in_vivo_assembly, pcr_assembly
 from pydna.dseqrecord import Dseqrecord

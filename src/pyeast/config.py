@@ -9,7 +9,6 @@ Configuration priority (highest to lowest):
 
 import os
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -81,10 +80,10 @@ class PyeastConfig:
         if config_data and 'output_dir' in config_data:
             return Path(config_data['output_dir']).resolve()
 
-        # Priority 3: Default user directory  
+        # Priority 3: Default user directory
         return (Path.home() / "PYEAST" / "output").resolve()
 
-    def _load_config_file(self) -> Optional[dict]:
+    def _load_config_file(self) -> dict | None:
         """Load configuration from ~/PYEAST/config.yaml if it exists.
 
         Falls back to the legacy ~/.pyeast/config.yaml location (read-only) so
@@ -109,7 +108,7 @@ class PyeastConfig:
         return None
 
 # Singleton instance
-_config: Optional[PyeastConfig] = None
+_config: PyeastConfig | None = None
 
 
 def get_config() -> PyeastConfig:

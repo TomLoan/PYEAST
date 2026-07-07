@@ -27,7 +27,6 @@ import logging
 import os
 from collections import Counter
 from pathlib import Path
-from typing import Optional
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -191,7 +190,7 @@ def get_templates(parts: list[SeqRecord], directory: str) -> dict[str, list[str]
     return templates_used
 
 def rationalize_templates(template_dict: dict[str, list[str]],
-                          preferred_templates: Optional[list[str]] = None) -> dict[str, str]:
+                          preferred_templates: list[str] | None = None) -> dict[str, str]:
     """
     Rationalize template selection to minimize the number of unique templates.
 
@@ -365,7 +364,7 @@ def write_linear_instructions(rationalized_primers: dict[str, dict],
 
     return instructions
 
-def find_matching_primer(primers: dict[str, dict], part_seq: Seq, is_forward: bool, homology_length: int) -> Optional[dict]:
+def find_matching_primer(primers: dict[str, dict], part_seq: Seq, is_forward: bool, homology_length: int) -> dict | None:
     """
     Find a matching primer for a given part sequence.
 

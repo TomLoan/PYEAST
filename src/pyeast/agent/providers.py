@@ -10,10 +10,9 @@ translates to/from it at its own boundary.
 import json
 import os
 import sys
-import uuid
-
 import urllib.error
 import urllib.request
+import uuid
 
 
 class LLMProvider:
@@ -213,7 +212,7 @@ class OpenAIProvider(LLMProvider):
         # LM Studio ignores the key, but the header is harmless and other
         # OpenAI-compatible servers may require it.
         self.api_key = os.environ.get("OPENAI_API_KEY", "lm-studio")
- 
+
     @staticmethod
     def _to_openai_tools(tools: list) -> list:
         # Same wrapping Ollama uses; this part of the format is shared.
@@ -228,7 +227,7 @@ class OpenAIProvider(LLMProvider):
             }
             for tool in tools
         ]
- 
+
     @staticmethod
     def _result_to_text(content) -> str:
         # A tool_result's content may be a plain string or a list of blocks.
@@ -243,19 +242,19 @@ class OpenAIProvider(LLMProvider):
                     parts.append(str(block))
             return "\n".join(parts)
         return str(content)
- 
+
     @classmethod
     def _to_openai_messages(cls, messages: list, system_prompt: str) -> list:
         openai_messages = [{"role": "system", "content": system_prompt}]
- 
+
         for message in messages:
             role = message["role"]
             content = message["content"]
- 
+
             if isinstance(content, str):
                 openai_messages.append({"role": role, "content": content})
                 continue
- 
+
             text_parts = []
             tool_calls = []
             for block in content:
@@ -279,7 +278,7 @@ class OpenAIProvider(LLMProvider):
                         "tool_call_id": block["tool_use_id"],
                         "content": cls._result_to_text(block["content"]),
                     })
- 
+
             if text_parts or tool_calls:
                 assistant_message = {
                     "role": role,
@@ -288,9 +287,9 @@ class OpenAIProvider(LLMProvider):
                 if tool_calls:
                     assistant_message["tool_calls"] = tool_calls
                 openai_messages.append(assistant_message)
- 
+
         return openai_messages
- 
+
     def send(self, messages: list, system_prompt: str, tools: list) -> dict:
         payload = {
             "model": self.model,
@@ -298,7 +297,7 @@ class OpenAIProvider(LLMProvider):
             "tools": self._to_openai_tools(tools),
             "stream": False,
         }
- 
+
         request = urllib.request.Request(
             f"{self.base_url}/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
@@ -308,7 +307,7 @@ class OpenAIProvider(LLMProvider):
             },
             method="POST",
         )
- 
+
         try:
             with urllib.request.urlopen(request, timeout=300) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
@@ -319,17 +318,17 @@ class OpenAIProvider(LLMProvider):
                 "make sure a model is loaded into memory."
             )
             sys.exit(1)
- 
+
         message = body["choices"][0]["message"]
- 
+
         text = message.get("content") or ""
         if text:
             print(text, end="", flush=True)
- 
+
         content_blocks = []
         if text:
             content_blocks.append({"type": "text", "text": text})
- 
+
         for call in message.get("tool_calls") or []:
             function = call["function"]
             arguments = function.get("arguments", "{}")
@@ -347,6 +346,6 @@ class OpenAIProvider(LLMProvider):
                 "name": function["name"],
                 "input": arguments,
             })
- 
+
         stop_reason = "tool_use" if (message.get("tool_calls")) else "end_turn"
         return {"content": content_blocks, "stop_reason": stop_reason}

@@ -28,7 +28,6 @@ from datetime import datetime
 from pathlib import Path
 
 import click
-from Bio import SeqIO
 from PIL import Image
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import WordCompleter

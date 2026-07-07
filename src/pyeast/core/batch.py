@@ -35,7 +35,6 @@ import csv
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import openpyxl
 import pandas as pd
@@ -73,9 +72,9 @@ class BatchDesigner:
     def __init__(self,
                  reuse_limit = 5,
                  batch_size: int = 96,
-                 primer_folder: Optional[Path] = None,
-                 template_folder: Optional[Path] = None,
-                 output_folder: Optional[Path] = None):
+                 primer_folder: Path | None = None,
+                 template_folder: Path | None = None,
+                 output_folder: Path | None = None):
         """Initialize BatchDesigner with specified parameters.
 
         Args:
@@ -197,7 +196,7 @@ class BatchDesigner:
         if not self.available_constructs:
             raise ValueError(
                 "No valid GenBank files found for batch processing.\n"
-                "Ensure Output directory is correct. \n" 
+                "Ensure Output directory is correct. \n"
                 "Make sure you've run 'tar' or 'integrate' commands first to generate constructs."
             )
 
@@ -1134,7 +1133,7 @@ class BatchDesigner:
         return str(janus_file)
 
 
-    def _get_template_position(self, template_name: str) -> tuple[Optional[str], Optional[str]]:
+    def _get_template_position(self, template_name: str) -> tuple[str | None, str | None]:
         """Find the plate and well position for a given template.
 
         First checks if the template is a contig/chromosome in the genome mapping file
