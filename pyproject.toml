@@ -48,7 +48,6 @@ agent = ["anthropic>=0.50.0"]
 Homepage = "https://github.com/TomLoan/PYEAST"
 Repository = "https://github.com/TomLoan/PYEAST"
 "Bug Tracker" = "https://github.com/TomLoan/PYEAST/issues"
-Preprint = "https://doi.org/10.1101/2025.05.19.655004"
 
 [build-system]
 requires = ["hatchling"]

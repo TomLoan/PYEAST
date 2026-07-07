@@ -192,3 +192,4 @@ output/
 .env*
 !.env.example
 .claude/
+.scratch/
