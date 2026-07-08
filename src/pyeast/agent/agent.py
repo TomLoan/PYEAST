@@ -2,7 +2,13 @@
 
 import warnings
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    # python-dotenv ships in the optional 'agent' extra. Without it, .env files
+    # are simply not loaded; providers that need no extra (ollama, openai) still work.
+    def load_dotenv(*args: object, **kwargs: object) -> bool:
+        return False
 
 from pyeast.agent.providers import AnthropicProvider, OllamaProvider, OpenAIProvider
 from pyeast.agent.tools import TOOL_SCHEMAS, dispatch_tool
