@@ -33,11 +33,11 @@ from pathlib import Path
 
 from Bio import SeqIO
 from Bio.Seq import Seq
-from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
 
 from pyeast.utils.path_utils import get_component_libraries_path, get_templates_path
 from pyeast.utils.primer_utils import design_screening_primers
+from pyeast.utils.sequence_utils import pyeast_component_feature
 
 
 @dataclass
@@ -220,69 +220,45 @@ class ReplaceDesigner:
         current_pos = 0
 
         # Upstream homology
-        features.append(SeqFeature(
-            FeatureLocation(0, self.upstream_homology_len),
-            type="misc_feature",
-            qualifiers={"label": "upstream homology"}
-        ))
+        features.append(pyeast_component_feature(
+            0, self.upstream_homology_len, "upstream homology"))
         current_pos += self.upstream_homology_len
 
         if self.marker_position == "upstream":
             # URA3 marker
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + len(ura3_marker)),
-                type="gene",
-                qualifiers={"label": "URA3"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + len(ura3_marker), "URA3"))
             current_pos += len(ura3_marker)
 
             # Repeat
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + self.repeat_length),
-                type="misc_feature",
-                qualifiers={"label": "repeat"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + self.repeat_length, "repeat"))
             current_pos += self.repeat_length
 
             # Replacement sequence
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + len(self.replacement_sequence.seq)),
-                type="misc_feature",
-                qualifiers={"label": "replacement"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + len(self.replacement_sequence.seq), "replacement"))
             current_pos += len(self.replacement_sequence.seq)
 
         else:  # downstream
             # Replacement sequence
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + len(self.replacement_sequence.seq)),
-                type="misc_feature",
-                qualifiers={"label": "replacement"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + len(self.replacement_sequence.seq), "replacement"))
             current_pos += len(self.replacement_sequence.seq)
 
             # Repeat
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + self.repeat_length),
-                type="misc_feature",
-                qualifiers={"label": "repeat"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + self.repeat_length, "repeat"))
             current_pos += self.repeat_length
 
             # URA3 marker
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + len(ura3_marker)),
-                type="gene",
-                qualifiers={"label": "URA3"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + len(ura3_marker), "URA3"))
             current_pos += len(ura3_marker)
 
         # Downstream homology
-        features.append(SeqFeature(
-            FeatureLocation(current_pos, current_pos + self.downstream_homology_len),
-            type="misc_feature",
-            qualifiers={"label": "downstream homology"}
-        ))
+        features.append(pyeast_component_feature(
+            current_pos, current_pos + self.downstream_homology_len, "downstream homology"))
 
         cassette.features = features
         self.replacement_cassette = cassette

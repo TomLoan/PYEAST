@@ -299,7 +299,8 @@ def design_circular_primers(parts: list[SeqRecord], target_tm=50, overhang_lengt
 
     return add_circular_overhangs(primers, parts, overhang_length)
 
-def add_linear_overhangs(primers: dict[str, Seq], parts: list[SeqRecord], int_site: tuple[SeqRecord, SeqRecord], overhang_length: int) -> dict[str, Seq]:
+def add_linear_overhangs(primers: dict[str, Seq], parts: list[SeqRecord], int_site: tuple[SeqRecord, SeqRecord], overhang_length: int)\
+      -> dict[str, Seq]:
     """
     Add overhangs to primers for linear integration assembly.
 

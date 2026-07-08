@@ -137,6 +137,10 @@ line-length = 150
 # Add specific rule codes/groups here to ignore them, or add a '#noqa' comment to the line of code to skip all checks.
 ignore = [
     "PLR", # complexity rules
+    'N801', # class name CapsWord convention - goldengate supposed to be lower case here
+    'N813', # Camel case as lower case import ( Biopython recomended for MeltTemp as mt)
+    'F403', # Allow wildcard imports
+    'E101' # Interprets help text as mixed tab/space - important for alignment of text
 ]
 
 # Option 1: use basic rules only.
@@ -157,7 +161,7 @@ select = [
 
 # Ruff rule-specific options:
 [tool.ruff.lint.mccabe]
-max-complexity = 12 # increase max function 'complexity'
+max-complexity = 22 # increase max function 'complexity'
 
 
 [tool.mypy]

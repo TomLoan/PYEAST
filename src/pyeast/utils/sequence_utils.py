@@ -30,6 +30,7 @@ from pathlib import Path
 
 from Bio import SeqIO
 from Bio.Seq import Seq
+from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
 
 from .path_utils import get_private_equivalent
@@ -41,6 +42,12 @@ from .path_utils import get_private_equivalent
 # type="PYEAST_component"; that is still recognised for backward compatibility.
 PYEAST_COMPONENT_NOTE = "PYEAST_component"
 
+# GenBank DEFINITION lines PYEAST writes onto assembled constructs. Batch processing uses
+# these to recognise valid tar/integrate outputs (and skip cassettes / unrelated files),
+# so the writer (pydna_utils) and reader (batch) must share the exact strings.
+TAR_CONSTRUCT_DESCRIPTION = "Plasmid assembled by TAR cloning simulation"
+INTEGRATION_CONSTRUCT_DESCRIPTION = "Assembled sequence for genomic integration"
+
 
 def is_pyeast_component(feature) -> bool:
     """True if a SeqFeature marks a PYEAST component part.
@@ -51,6 +58,20 @@ def is_pyeast_component(feature) -> bool:
     if feature.type == "PYEAST_component":
         return True
     return PYEAST_COMPONENT_NOTE in feature.qualifiers.get("note", [])
+
+
+def pyeast_component_feature(start, end, label, strand=None) -> SeqFeature:
+    """Build a misc_feature marked as a PYEAST component (so the visualiser renders it).
+
+    Carries the /note=PYEAST_component marker recognised by is_pyeast_component, keeping the
+    mark and its check colocated. Everything in a hand-built cassette is a component to show,
+    so the feature type is always misc_feature - the visualiser draws by label, not type.
+    """
+    return SeqFeature(
+        FeatureLocation(start, end, strand=strand),
+        type="misc_feature",
+        qualifiers={"label": [label], "note": [PYEAST_COMPONENT_NOTE]},
+    )
 
 
 def get_component_features(record) -> list:

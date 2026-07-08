@@ -33,11 +33,11 @@ from pathlib import Path
 
 from Bio import SeqIO
 from Bio.Seq import Seq
-from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
 
 from pyeast.utils.path_utils import get_component_libraries_path, get_templates_path
 from pyeast.utils.primer_utils import design_screening_primers
+from pyeast.utils.sequence_utils import pyeast_component_feature
 
 
 @dataclass
@@ -192,30 +192,14 @@ class DeletionDesigner:
         )
 
         # Add features
+        repeat_start = self.upstream_homology_len
+        ura3_start = repeat_start + self.repeat_length
+        downstream_start = ura3_start + len(ura3_marker)
         features = [
-            SeqFeature(
-                FeatureLocation(0, self.upstream_homology_len),
-                type="misc_feature",
-                qualifiers={"label": "upstream homology"}
-            ),
-            SeqFeature(
-                FeatureLocation(self.upstream_homology_len,
-                            self.upstream_homology_len + self.repeat_length),
-                type="misc_feature",
-                qualifiers={"label": "repeat"}
-            ),
-            SeqFeature(
-                FeatureLocation(self.upstream_homology_len + self.repeat_length,
-                            self.upstream_homology_len + self.repeat_length + len(ura3_marker)),
-                type="gene",
-                qualifiers={"label": "URA3"}
-            ),
-            SeqFeature(
-                FeatureLocation(self.upstream_homology_len + self.repeat_length + len(ura3_marker),
-                            len(cassette_seq)),
-                type="misc_feature",
-                qualifiers={"label": "downstream homology"}
-            )
+            pyeast_component_feature(0, self.upstream_homology_len, "upstream homology"),
+            pyeast_component_feature(repeat_start, ura3_start, "repeat"),
+            pyeast_component_feature(ura3_start, downstream_start, "URA3"),
+            pyeast_component_feature(downstream_start, len(cassette_seq), "downstream homology"),
         ]
 
         cassette.features = features

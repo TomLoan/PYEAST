@@ -380,12 +380,14 @@ class ggDesigner:
             instructions_dataframe = instructions_dataframe.drop('wells', axis = 1)
             janus_instructions = instructions_dataframe[['construct_id', 'asperate_plate', 'asperate_well', 'destination_well']].copy()
             janus_instructions['transfer_volume'] = 1
-            janus_instructions['destination_plate'] = 'assembly plate' # need in increment this up by one ever 96 assemblies (will this ever happen? It's so much material!)
-            janus_instructions = janus_instructions[['construct_id', 'asperate_plate', 'asperate_well', 'destination_plate', 'destination_well', 'transfer_volume']]
+            janus_instructions['destination_plate'] = 'assembly plate' #increment this up by one every 96 assemblies? will this ever happen?
+            janus_instructions = janus_instructions[['construct_id', 'asperate_plate', 'asperate_well',
+                                                      'destination_plate', 'destination_well', 'transfer_volume']]
             janus_instructions.to_csv(f"{output_path}/{assembly_name}_worklist.csv", index = False)
             logger.info(f"Saved worklist to {output_path}/{assembly_name}_worklist.csv")
 
-            # For single head machines you can use these columns to save tips. Different, v. complex implementation required for multi see CRVP paper by Wu et al 2025
+            # For single head machines you can use these columns to save tips.
+            # Different, v. complex implementation required for multi see CRVP paper by Wu et al 2025
             # instructions_dataframe = instructions_dataframe.sort_values(by = ['asperate_plate','asperate_well'])
             # janus_instructions['new_tip'] = (
             #     janus_instructions['asperate_well'] != janus_instructions['asperate_well'].shift()).map({True:'T', False: 'F'})

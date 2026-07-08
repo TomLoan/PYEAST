@@ -161,7 +161,6 @@ def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> 
     if click.confirm("\nWould you like to generate machine instructions for liquid handling?"):
         machines = ['epMotion', 'Janus', 'Hamilton']
         valid_names = [m.lower() for m in machines]
-        valid_indices = [str(i) for i in range(1, len(machines) + 1)]
         completer = WordCompleter(machines, ignore_case=True)
 
         while True:
@@ -784,7 +783,7 @@ def run_tar_interactive_mode(designer: TARDesigner):
                 console.print(f"[red]Error saving files: {str(e)}[/red]")
                 raise
 
-        console.print("\n[bold green]checkmark[/bold green] Plasmid design complete!")
+        console.print("\n[bold green] Plasmid design complete![/bold green]")
 
     except click.Abort:
         console.print("\n[yellow]Operation cancelled[/yellow]")
@@ -895,7 +894,7 @@ def run_integration_interactive_mode(designer: IntegrationDesigner):
                 console.print(f"[red]Error saving files: {str(e)}[/red]")
                 raise
 
-        console.print("\n[bold green]checkmark[/bold green] Integration design complete!")
+        console.print("\n[bold green]Integration design complete![/bold green]")
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Operation cancelled[/yellow]")
@@ -1024,7 +1023,7 @@ def run_deletion_interactive_mode(designer: DeletionDesigner):
             console.print(f"[green]Sequence map: {output_prefix}_map.png[/green]")
             console.print(f"[green]Screening primers: {output_prefix}_screening_primers.tsv[/green]")
 
-        console.print("\n[bold green]checkmark[/bold green] Deletion design complete!")
+        console.print("\n[bold green]Deletion design complete![/bold green] ")
 
     except click.Abort:
         console.print("\n[yellow]Operation cancelled[/yellow]")
@@ -1049,7 +1048,8 @@ def run_replace_interactive_mode(designer: ReplaceDesigner):
 
             min_target_len = min(designer.downstream_homology_len, designer.upstream_homology_len)
             if len(sequence) < min_target_len:
-                console.print("[red]Target sequence is shorter than the homology lengths. Adjust with --downstream_homology_len and --upstream_homology_len[/red]")
+                console.print("[red]Target sequence is shorter than the homology lengths." \
+                " Adjust with --downstream_homology_len and --upstream_homology_len[/red]")
                 continue
             break
 
@@ -1136,7 +1136,7 @@ def run_replace_interactive_mode(designer: ReplaceDesigner):
             console.print(f"[green]Sequence map: {output_prefix}_map.png[/green]")
             console.print(f"[green]Screening primers: {output_prefix}_screening_primers.tsv[/green]")
 
-        console.print("\n[bold green]checkmark[/bold green] Replacement design complete!")
+        console.print("\n[bold green]Replacement design complete![/bold green]")
 
     except click.Abort:
         console.print("\n[yellow]Operation cancelled[/yellow]")
@@ -1516,9 +1516,9 @@ def integrate(homology_length):
     upstream_seq + Component1 + Component2 + ... + downstream_seq	PCR products
 	      X                                          X
     upstream_seq==================================downsteam_seq	        gDNA
-		||
+	     ||
 	**transformation**
-		\\/
+        \\/
     upstream+component1==component1==...==downstream_seq                gDNA
     """
 

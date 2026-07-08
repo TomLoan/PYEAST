@@ -44,12 +44,17 @@ from Bio.SeqFeature import CompoundLocation
 from Bio.SeqRecord import SeqRecord
 from tabulate import tabulate
 
-logger = logging.getLogger(__name__)
-
 from pyeast.utils.path_utils import get_output_path, get_primers_path, get_templates_path
 from pyeast.utils.primer_utils import get_primer_locations, rationalize_primers
-from pyeast.utils.sequence_utils import get_component_features, get_templates, rationalize_templates
+from pyeast.utils.sequence_utils import (
+    INTEGRATION_CONSTRUCT_DESCRIPTION,
+    TAR_CONSTRUCT_DESCRIPTION,
+    get_component_features,
+    get_templates,
+    rationalize_templates,
+)
 
+logger = logging.getLogger(__name__)
 
 class BatchDesigner:
     """Designer class for batch DNA assembly experiments.
@@ -115,9 +120,9 @@ class BatchDesigner:
         Only loads constructs suitable for batch processing (from tar/integrate commands).
         Automatically excludes cassettes from replace/delete commands and gg assemblies.
         """
-        VALID_DEFINITIONS = {
-            "Plasmid assembled by TAR cloning simulation",
-            "Assembled sequence for genomic integration"
+        valid_definitions = {
+            TAR_CONSTRUCT_DESCRIPTION,
+            INTEGRATION_CONSTRUCT_DESCRIPTION,
         }
         self.available_constructs = {}
 
@@ -130,7 +135,7 @@ class BatchDesigner:
 
                 # Check if this is a valid target for batch processing
                 description = record.description
-                if description not in VALID_DEFINITIONS:
+                if description not in valid_definitions:
                     skipped_count += 1
                     # self.console.print(f"[dim]Skipped {filename.stem} (not a TAR/integrate output)[/dim]")
                     continue
@@ -165,7 +170,7 @@ class BatchDesigner:
                     # Check if this is a valid target for batch processing
                     description = record.description
                     # print(description)
-                    if description not in VALID_DEFINITIONS:
+                    if description not in valid_definitions:
                           skipped_count += 1
                           continue
 
@@ -916,7 +921,8 @@ class BatchDesigner:
                         well = reaction_wells[well_key]
                         required_wells.append(well)
                     else:
-                        logger.warning(f"Could not find well for {well_key[1]} in batch {batch_num} (use {curent_use}, repeat {repeat_number}, limit {self.reuse_limit})")
+                        logger.warning(f"Could not find well for {well_key[1]} in batch {batch_num} \
+                                       (use {curent_use}, repeat {repeat_number}, limit {self.reuse_limit})")
                 # Create assembly group row
                 row = [
                     batch_num,

@@ -64,7 +64,12 @@ from pydna.opencloning_models import CloningStrategy
 from pydna.primer import Primer
 
 from .path_utils import get_private_equivalent
-from .sequence_utils import PYEAST_COMPONENT_NOTE, is_pyeast_component
+from .sequence_utils import (
+    INTEGRATION_CONSTRUCT_DESCRIPTION,
+    PYEAST_COMPONENT_NOTE,
+    TAR_CONSTRUCT_DESCRIPTION,
+    is_pyeast_component,
+)
 
 # The permissive seed used only to *find* candidate priming sites for the specificity
 # analysis (short enough to surface weak/partial sites, which are then judged by Tm).
@@ -284,7 +289,10 @@ def build_amplicons(
 
         # 2) dummy template (part sequence only)
         dummy = Dseqrecord(str(part.seq))
-        dummy.name = f"{part.id}_missing_template"
+        # Cap at GenBank's 16-char LOCUS name limit: OpenCloning serialises this template
+        # to a GenBank string when building the cloning history, and an over-long name warns.
+        # The part identity is carried by the amplicon (amp.name = part.id) below.
+        dummy.name = f"{part.id}_dummy"[:16]
         amp = _amplify(dummy)
         if amp is not None:
             amp.name = part.id
@@ -480,7 +488,7 @@ def pcr_specificity(
     return warnings
 
 
-class AssemblyExplosion(Exception):
+class AssemblyExplosionError(Exception):
     """Raised internally when in_vivo_assembly hits the too-many-paths cap."""
 
 
@@ -600,7 +608,7 @@ def annotate_circular_product(
             ))
             current += part_len
 
-    _finalize(shifted, name, topology="circular")
+    _finalize(shifted, name, topology="circular", description=TAR_CONSTRUCT_DESCRIPTION)
     return shifted
 
 
@@ -638,14 +646,19 @@ def annotate_linear_product(
             ))
             current += part_len
 
-    _finalize(product, name, topology="linear")
+    _finalize(product, name, topology="linear", description=INTEGRATION_CONSTRUCT_DESCRIPTION)
     return product
 
 
-def _finalize(record, name: str, topology: str) -> None:
-    """Set the id/name and the GenBank annotations PYEAST outputs expect."""
+def _finalize(record, name: str, topology: str, description: str) -> None:
+    """Set the id/name/description and the GenBank annotations PYEAST outputs expect.
+
+    ``description`` becomes the GenBank DEFINITION line; batch processing relies on it to
+    recognise valid tar/integrate constructs, so it must not be left as pydna's default.
+    """
     record.id = name
     record.name = name
+    record.description = description
     record.annotations["molecule_type"] = "DNA"
     record.annotations["topology"] = topology
     record.annotations["date"] = datetime.now().strftime("%d-%b-%Y").upper()
