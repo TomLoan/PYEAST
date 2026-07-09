@@ -1390,7 +1390,7 @@ def _clone_data_repo(subprocess) -> None:
 
 @click.group()
 def cli():
-    """PYeast: Python tools for yeast genetic engineering
+    """PYEAST: Python tools for yeast genetic engineering
 
     Created by Tom Loan"""
     pass
