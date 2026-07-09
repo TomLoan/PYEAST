@@ -3,11 +3,10 @@
 import json
 import shutil
 import tempfile
-from datetime import datetime
-from pathlib import Path
-
 import urllib.error
 import urllib.request
+from datetime import datetime
+from pathlib import Path
 
 from pyeast.utils.path_utils import (
     ensure_output_dir_exists,

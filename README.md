@@ -24,7 +24,7 @@ uv tool install git+https://github.com/TomLoan/PYEAST.git
 pyeast init
 ```
 
-`pyeast init` clones the [data repository](https://github.com/TomLoan/PYEAST_data) to `~/.pyeast/data-repo/` and configures PYEAST automatically. If you have already downloaded the data elsewhere, point PYEAST at it instead:
+`pyeast init` clones the [data repository](https://github.com/TomLoan/PYEAST_data) to `~/PYEAST/data/` and configures PYEAST automatically. If you have already downloaded the data elsewhere, point PYEAST at it instead:
 
 ```bash
 pyeast init --data-dir /path/to/PYEAST_data
@@ -42,28 +42,28 @@ Run `pyeast --help` to see all available commands:
 | `pyeast replace` | Design replacement cassettes (scarless marker-recycling method)|
 | `pyeast gg` | Design Golden Gate / MoClo assemblies |
 | `pyeast batch` | Regenerate instruction files for previously designed assemblies |
-| `pyeast agent` | Interactive LLM-powered experiment design session |
+| `pyeast agent` | Interactive LLM-powered experiment design session (default backend needs an [extra](#installation-1)) |
 | `pyeast init` | Configure the data directory |
 
 For help with any command: `pyeast COMMAND --help`
 
 ## TAR Cloning
 
-Transformation-Assisted Recombination (TAR) exploits *S. cerevisiae*'s natural homologous recombination to assemble PCR products into new plasmids in a single yeast transformation. PYEAST designs all primers, including the homology overhangs, for each part in your assembly.
+Transformation-Assisted Recombination (TAR) exploits *S. cerevisiae*'s natural homologous recombination to assemble PCR products into new plasmids in a single yeast transformation. PYEAST designs all primers, including the homology overhangs, for each part in your assembly. PYEAST uses [pydna](https://github.com/pydna-group/pydna) to model the PCR and homologous recombination steps and writes a cloning-history file (<name>_history.json) that you load history in [OpenCloning](https://app.opencloning.org/) to visualise and share how the plasmid was assembled.
 
 ## Chromosomal Integration
 
-Design primers for inserting a DNA construct into a specific locus in the yeast genome. PYEAST calculates the flanking homology sequences required for efficient integration.
+Design primers for inserting a DNA construct into a specific locus in the yeast genome. PYEAST calculates the flanking homology sequences required for efficient integration. As with TAR cloning, the integration is modelled with pydna and exported as an OpenCloning history file for visualising the assembly.
+ 
 
 ## Gene Deletion and Replacement
 
 Design cassettes for deleting or replacing genes using the scarless marker-recycling method described by [Akada et al., 2006](https://doi.org/10.1002/yea.1365).
 
 ## Beta feature: Golden Gate / MoClo Assembly
-
 == Beta feature, please double check outputs ==
 
-Design Golden Gate assemblies using the MoClo standard. The following part libraries are included out of the box:
+Design Golden Gate assemblies using the MoClo standard. Uses [DNA Cauldron](https://github.com/Edinburgh-Genome-Foundry/DnaCauldron) to simulate the assembly. The following part libraries are included out of the box:
 
 | Kit | Reference |
 |---|---|
@@ -75,11 +75,26 @@ To add parts to an existing kit, save a FASTA file to `component_libraries/<kit_
 
 To add a new Golden Gate kit, create a new subfolder in `component_libraries/` and follow the same structure.
 
-## LLM Agent
+## Beta feature: LLM Agent
+== Beta feature, please double check outputs ==
 
 `pyeast agent` starts an interactive session where you describe your experiment in plain language. The agent discovers available components, looks up gene sequences from SGD, designs TAR cloning, chromosomal integrations, gene deletions and replacements, and generates consolidated PCR batch instructions — calling the same underlying functions as the CLI commands.
 
 > **Note:** The agent is an interface layer over the standard design tools. Double-check outputs against direct CLI command results if you have any doubts.
+
+### Installation
+
+The default **Anthropic** backend requires an extra that is **not installed by default**. Enable it by installing PYEAST with the `agent` extra:
+
+```bash
+uv tool install "git+https://github.com/TomLoan/PYEAST.git#egg=pyeast[agent]"
+```
+
+If you have already installed PYEAST, re-run the command above to add the extra. Running the default backend without it exits with an error telling you to install `pyeast[agent]`.
+
+The **Ollama** and **OpenAI-compatible** backends (below) need no extra dependency and work with a standard install. All other PYEAST commands work without the extra too.
+
+### Usage
 
 Three LLM backends are supported. Copy `.env.example` to `.env` and fill in the relevant keys.
 
@@ -101,7 +116,6 @@ pyeast agent --provider openai --model <model-key>
 pyeast agent --provider openai --model <model-key> --base-url http://localhost:5678/v1
 ```
 
-For full setup instructions see [docs/](docs/).
 
 ## Private Data
 
@@ -127,7 +141,7 @@ When you run `pyeast init`, the `private/` folder structure is created automatic
 PYEAST looks for data in this order:
 
 1. Environment variable: `PYEAST_DATA_DIR`
-2. Config file: `~/.pyeast/config.yaml`
+2. Config file: `~/PYEAST/config.yaml`
 3. Default: `~/PYEAST/data/`
 
 To view or update your current configuration, run `pyeast init`.

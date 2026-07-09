@@ -70,7 +70,7 @@ class TestInitCommand:
         assert result.exit_code == 0
         assert "Configured PYEAST to use data at" in result.output
 
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         assert config_file.exists()
 
         with open(config_file) as f:
@@ -95,7 +95,7 @@ class TestInitCommand:
         assert "Configured PYEAST to use data at" in result.output
         assert "Output directory set to" in result.output
 
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         with open(config_file) as f:
             config_data = yaml.safe_load(f)
 
@@ -159,14 +159,14 @@ class TestInitCommand:
         assert result.exit_code == 0
         assert "Configured PYEAST to use data at" in result.output
 
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         with open(config_file) as f:
             config_data = yaml.safe_load(f)
         assert Path(config_data['data_dir']) == new_data_dir.resolve()
 
     def test_init_no_args_clones_repo(self, runner, isolated_config):
         """Test init with no args and nothing configured — should clone data repo."""
-        clone_dir = isolated_config['home'] / ".pyeast" / "data-repo"
+        clone_dir = isolated_config['home'] / "PYEAST" / "data"
 
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -182,7 +182,7 @@ class TestInitCommand:
         )
         assert "Cloning PYEAST data repository" in result.output
 
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         assert config_file.exists()
         with open(config_file) as f:
             config_data = yaml.safe_load(f)
@@ -190,7 +190,7 @@ class TestInitCommand:
 
     def test_init_no_args_clone_fails(self, runner, isolated_config):
         """Test init with no args when git clone fails."""
-        clone_dir = isolated_config['home'] / ".pyeast" / "data-repo"
+        clone_dir = isolated_config['home'] / "PYEAST" / "data"
 
         mock_result = MagicMock()
         mock_result.returncode = 1
@@ -203,20 +203,44 @@ class TestInitCommand:
         assert result.exit_code != 0
         assert "Clone failed" in result.output
 
-    def test_init_no_args_already_cloned(self, runner, isolated_config):
-        """Test init with no args when clone dir already exists — should not re-clone."""
-        clone_dir = isolated_config['home'] / ".pyeast" / "data-repo"
+    def test_init_no_args_git_not_installed(self, runner, isolated_config):
+        """Test init with no args when git is not installed at all.
+
+        subprocess.run raises FileNotFoundError before returning a result; the
+        command must abort with actionable guidance instead of a raw traceback.
+        """
+        clone_dir = isolated_config['home'] / "PYEAST" / "data"
+
+        with patch('pyeast.cli.main._DATA_REPO_CLONE_DIR', clone_dir), \
+             patch('subprocess.run', side_effect=FileNotFoundError("[WinError 2]")):
+            result = runner.invoke(cli, ['init'])
+
+        assert result.exit_code != 0
+        assert result.exception is None or isinstance(result.exception, SystemExit)
+        assert "git not found" in result.output
+        assert "git-scm.com" in result.output
+        assert "--data-dir" in result.output
+
+    def test_init_already_cloned_not_recloned(self, runner, isolated_config):
+        """When the clone dir already exists, choosing clone again detects it and does not re-clone.
+
+        The clone destination (~/PYEAST/data) is also the default data dir, so its
+        existence makes init report "already configured"; reconfiguring with option 2
+        (clone) must hit the idempotent "already cloned" branch rather than re-clone.
+        """
+        clone_dir = isolated_config['home'] / "PYEAST" / "data"
         clone_dir.mkdir(parents=True)
 
         with patch('pyeast.cli.main._DATA_REPO_CLONE_DIR', clone_dir), \
              patch('subprocess.run') as mock_run:
-            result = runner.invoke(cli, ['init'])
+            # already configured (default dir exists) -> reconfigure -> option 2 (clone)
+            result = runner.invoke(cli, ['init'], input='y\n2\n')
 
         assert result.exit_code == 0, result.output
         mock_run.assert_not_called()
         assert "already cloned" in result.output
 
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         with open(config_file) as f:
             config_data = yaml.safe_load(f)
         assert Path(config_data['data_dir']) == clone_dir
@@ -224,7 +248,7 @@ class TestInitCommand:
     def test_init_already_configured_reconfigure_clone(self, runner, isolated_config):
         """Test reconfiguring via clone when already configured with a different path."""
         data_dir = isolated_config['data']
-        clone_dir = isolated_config['home'] / ".pyeast" / "data-repo"
+        clone_dir = isolated_config['home'] / "PYEAST" / "data"
 
         # Initial configuration
         runner.invoke(cli, ['init', '--data-dir', str(data_dir)])
@@ -250,7 +274,7 @@ class TestConfigPriority:
 
     def test_env_var_takes_priority(self, isolated_config, monkeypatch):
         """Test that environment variable has highest priority."""
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         config_data_dir = isolated_config['tmp'] / "config_data"
@@ -272,7 +296,7 @@ class TestConfigPriority:
         """Test that config file is used when no environment variable."""
         monkeypatch.delenv('PYEAST_DATA_DIR', raising=False)
 
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         config_data_dir = isolated_config['tmp'] / "config_data"
@@ -316,7 +340,7 @@ class TestConfigOutputDir:
         """Test output_dir from config file."""
         monkeypatch.delenv('PYEAST_OUTPUT_DIR', raising=False)
 
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         data_dir = isolated_config['data']
@@ -350,7 +374,7 @@ class TestConfigFileHandling:
 
     def test_invalid_yaml_emits_warning(self, isolated_config):
         """Test that invalid YAML in config file emits warning and falls back to defaults."""
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         with open(config_file, 'w') as f:
@@ -365,7 +389,7 @@ class TestConfigFileHandling:
 
     def test_missing_config_file_ok(self, isolated_config):
         """Test that missing config file is OK."""
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         assert not config_file.exists()
 
         reset_config()
@@ -376,7 +400,7 @@ class TestConfigFileHandling:
 
     def test_partial_config_file(self, isolated_config):
         """Test config file with only some fields."""
-        config_file = isolated_config['home'] / ".pyeast" / "config.yaml"
+        config_file = isolated_config['home'] / "PYEAST" / "config.yaml"
         config_file.parent.mkdir(parents=True, exist_ok=True)
 
         data_dir = isolated_config['data']
@@ -391,3 +415,24 @@ class TestConfigFileHandling:
 
         expected_output = (isolated_config['home'] / "PYEAST" / "output").resolve()
         assert config.output_dir == expected_output
+
+    def test_legacy_config_location_still_read(self, isolated_config, monkeypatch):
+        """Legacy ~/.pyeast/config.yaml is read when the new location is absent."""
+        monkeypatch.delenv('PYEAST_DATA_DIR', raising=False)
+
+        # Only the legacy hidden location exists; the new one does not.
+        new_config = isolated_config['home'] / "PYEAST" / "config.yaml"
+        legacy_config = isolated_config['home'] / ".pyeast" / "config.yaml"
+        legacy_config.parent.mkdir(parents=True, exist_ok=True)
+
+        legacy_data_dir = isolated_config['tmp'] / "legacy_data"
+        legacy_data_dir.mkdir()
+        with open(legacy_config, 'w') as f:
+            yaml.dump({'data_dir': str(legacy_data_dir)}, f)
+
+        assert not new_config.exists()
+
+        reset_config()
+        config = get_config()
+
+        assert config.data_dir == legacy_data_dir.resolve()

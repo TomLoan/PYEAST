@@ -30,16 +30,14 @@ This module provides tools for designing pop-in/pop-out replacements in S. cerev
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from Bio import SeqIO
 from Bio.Seq import Seq
-from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
 
 from pyeast.utils.path_utils import get_component_libraries_path, get_templates_path
 from pyeast.utils.primer_utils import design_screening_primers
-from pyeast.utils.sequence_utils import load_sequences
+from pyeast.utils.sequence_utils import pyeast_component_feature
 
 
 @dataclass
@@ -73,8 +71,8 @@ class ReplaceDesigner:
                  upstream_homology_len: int = 200,
                  downstream_homology_len: int = 200,
                  repeat_length: int = 160,
-                 genome_file: Optional[Path] = None,
-                 ura3_file: Optional[Path] = None):
+                 genome_file: Path | None = None,
+                 ura3_file: Path | None = None):
         """Initialize the ReplaceDesigner.
 
         Args:
@@ -100,7 +98,7 @@ class ReplaceDesigner:
         self.product_sizes = None
         self.marker_position = "upstream"  # Default position
 
-    def find_target_sequence(self, genome_file: Path, target_seq: str) -> Optional[tuple[str, int, int, str]]:
+    def find_target_sequence(self, genome_file: Path, target_seq: str) -> tuple[str, int, int, str] | None:
         """Locate a target sequence in the genome.
 
         Args:
@@ -222,69 +220,45 @@ class ReplaceDesigner:
         current_pos = 0
 
         # Upstream homology
-        features.append(SeqFeature(
-            FeatureLocation(0, self.upstream_homology_len),
-            type="misc_feature",
-            qualifiers={"label": "upstream homology"}
-        ))
+        features.append(pyeast_component_feature(
+            0, self.upstream_homology_len, "upstream homology"))
         current_pos += self.upstream_homology_len
 
         if self.marker_position == "upstream":
             # URA3 marker
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + len(ura3_marker)),
-                type="gene",
-                qualifiers={"label": "URA3"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + len(ura3_marker), "URA3"))
             current_pos += len(ura3_marker)
 
             # Repeat
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + self.repeat_length),
-                type="misc_feature",
-                qualifiers={"label": "repeat"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + self.repeat_length, "repeat"))
             current_pos += self.repeat_length
 
             # Replacement sequence
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + len(self.replacement_sequence.seq)),
-                type="misc_feature",
-                qualifiers={"label": "replacement"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + len(self.replacement_sequence.seq), "replacement"))
             current_pos += len(self.replacement_sequence.seq)
 
         else:  # downstream
             # Replacement sequence
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + len(self.replacement_sequence.seq)),
-                type="misc_feature",
-                qualifiers={"label": "replacement"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + len(self.replacement_sequence.seq), "replacement"))
             current_pos += len(self.replacement_sequence.seq)
 
             # Repeat
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + self.repeat_length),
-                type="misc_feature",
-                qualifiers={"label": "repeat"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + self.repeat_length, "repeat"))
             current_pos += self.repeat_length
 
             # URA3 marker
-            features.append(SeqFeature(
-                FeatureLocation(current_pos, current_pos + len(ura3_marker)),
-                type="gene",
-                qualifiers={"label": "URA3"}
-            ))
+            features.append(pyeast_component_feature(
+                current_pos, current_pos + len(ura3_marker), "URA3"))
             current_pos += len(ura3_marker)
 
         # Downstream homology
-        features.append(SeqFeature(
-            FeatureLocation(current_pos, current_pos + self.downstream_homology_len),
-            type="misc_feature",
-            qualifiers={"label": "downstream homology"}
-        ))
+        features.append(pyeast_component_feature(
+            current_pos, current_pos + self.downstream_homology_len, "downstream homology"))
 
         cassette.features = features
         self.replacement_cassette = cassette
@@ -352,7 +326,7 @@ class ReplaceDesigner:
         replacement_sequence: SeqRecord,
         marker_position: str = "upstream",
         name: str = "replacement_cassette",
-        genome_location: Optional[tuple] = None,
+        genome_location: tuple | None = None,
     ) -> ReplaceResult:
         """Design a replacement cassette programmatically.
 

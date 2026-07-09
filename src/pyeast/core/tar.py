@@ -33,7 +33,16 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from pyeast.utils.primer_utils import design_circular_primers, get_primer_locations, rationalize_primers
-from pyeast.utils.sequence_utils import assemble_parts_circular, get_templates, load_sequences, rationalize_templates, write_circular_instructions
+from pyeast.utils.pydna_utils import (
+    annotate_circular_product,
+    assemble_in_vivo,
+    build_amplicons,
+    cloning_history_json,
+    diagnose_assembly,
+    load_template_index,
+    pcr_specificity,
+)
+from pyeast.utils.sequence_utils import get_templates, load_sequences, rationalize_templates, write_circular_instructions
 
 
 @dataclass
@@ -44,6 +53,11 @@ class TARResult:
     primers: dict
     instructions: list
     missing_primers: dict = field(default_factory=dict)
+    diagnostics: list = field(default_factory=list)
+    specificity: list = field(default_factory=list)
+    notes: list = field(default_factory=list)
+    provenance: object = None
+    history: str = None
 
     def save(self, output_prefix: Path) -> None:
         """Save GenBank file and TSV outputs.
@@ -54,6 +68,12 @@ class TARResult:
         """
         output_prefix = Path(output_prefix)
         SeqIO.write(self.assembly, f"{output_prefix}.gb", "genbank")
+
+        # Cloning history (OpenCloning CloningStrategy: primers + templates + how they
+        # assembled) from pydna's assembly source DAG - additive.
+        if self.history:
+            with open(f"{output_prefix}_history.json", "w") as f:
+                f.write(self.history)
 
         with open(f"{output_prefix}_all_primers.tsv", "w") as f:
             f.write("Name\tSequence\n")
@@ -97,9 +117,16 @@ class TARDesigner:
         self.primers_found = {}           # Primers found in plates
         self.missing_primers = {}         # Primers that need ordering
         self.template_dict = {}           # Template information
+        self.template_index = {}          # {template_name: SeqRecord} for pydna PCR
         self.rationalized_templates = {}  # Final template selections
         self.rationalized_primers = {}    # Final primer selections
         self.final_assembled_sequence = None    # Final assembled sequence
+        self.diagnostics = []             # Ambiguity diagnostic findings
+        self.specificity = []             # PCR-specificity warnings
+        self.assembly_notes = []          # Amplicon-build + assembly notes
+        self.provenance = None            # pydna assembly source (provenance DAG)
+        self.history = None               # OpenCloning CloningStrategy JSON
+        self._amplicons = []              # Built pydna amplicons (internal)
 
 
     def load_and_get_sequences(self, directory: Path) -> None:
@@ -180,6 +207,7 @@ class TARDesigner:
             raise ValueError("No sequences selected. Please select sequences first.")
 
         self.template_dict = get_templates(self.assembly_sequences, str(template_folder))
+        self.template_index = load_template_index(str(template_folder))
 
 
     def rationalize_selections(self) -> tuple[dict[str, dict], dict[str, str]]:
@@ -233,14 +261,57 @@ class TARDesigner:
             self.homology_length
         )
 
-    def create_assembly(self) -> SeqRecord:
-        """Create the assembled sequence with all parts and primers.
+    def diagnose(self) -> list[dict]:
+        """Run the pre-assembly ambiguity diagnostic and PCR-specificity analysis.
+
+        Builds pydna amplicons for the selected parts (real freezer template -> dummy ->
+        constructed fallback) and stores the ambiguity findings, specificity warnings, and
+        amplicon-build notes on the designer. Cheap enough to run before deciding whether to
+        proceed with assembly.
 
         Returns:
-            SeqRecord object representing the assembled construct with features
+            The ambiguity findings (empty list means a clean, unambiguous design).
+        """
+        if not self.primers:
+            raise ValueError("No primers available. Please design primers first.")
+        if not self.assembly_sequences:
+            raise ValueError("No sequences selected. Please select sequences first.")
+
+        self._amplicons, self.assembly_notes = build_amplicons(
+            self.assembly_sequences,
+            self.primers,
+            self.rationalized_templates,
+            self.template_index,
+            self.homology_length,
+        )
+        self.diagnostics = diagnose_assembly(
+            self._amplicons, limit=self.homology_length, overhang=self.homology_length
+        )
+        self.specificity = pcr_specificity(
+            self.assembly_sequences,
+            self.primers,
+            self.rationalized_templates,
+            self.template_index,
+            self.homology_length,
+        )
+        return self.diagnostics
+
+    def create_assembly(self, proceed_on_ambiguity: bool = True) -> SeqRecord:
+        """Create the assembled plasmid via pydna in-vivo-assembly.
+
+        Uses the amplicons built by diagnose() (running it if needed), simulates homologous
+        recombination with pydna, re-origins the circular product to the first part, and adds
+        PYEAST_component annotations. Degrades gracefully if the recombination graph explodes.
+
+        Args:
+            proceed_on_ambiguity: When False, an over-dense (ambiguous) design that blows past
+                pydna's path cap re-raises instead of falling back to a constructed product.
+
+        Returns:
+            SeqRecord (pydna Dseqrecord) representing the assembled construct with features.
 
         Raises:
-            ValueError: If no primers have been designed
+            ValueError: If no primers have been designed or no sequences selected.
         """
         if not self.primers:
             raise ValueError("No primers available. Please design primers first.")
@@ -248,10 +319,25 @@ class TARDesigner:
         if not self.assembly_sequences:
             raise ValueError("No sequences selected. Please select sequences first.")
 
-        self.final_assembled_plasmid = assemble_parts_circular(
+        if not getattr(self, "_amplicons", None):
+            self.diagnose()
+
+        product, assembly_notes = assemble_in_vivo(
+            self._amplicons,
+            limit=self.homology_length,
+            circular_only=True,
+            proceed_on_ambiguity=proceed_on_ambiguity,
+        )
+        self.assembly_notes = self.assembly_notes + assembly_notes
+        product.name = "assembly"
+        #self.provenance = getattr(product, "source", None)
+        self.history = cloning_history_json(product)
+
+        self.final_assembled_plasmid = annotate_circular_product(
+            product,
             self.assembly_sequences,
             self.primers,
-            self.homology_length
+            self.homology_length,
         )
 
         return self.final_assembled_plasmid
@@ -263,6 +349,7 @@ class TARDesigner:
         primer_folder: Path,
         template_folder: Path,
         name: str = "assembly",
+        proceed_on_ambiguity: bool = True,
     ) -> TARResult:
         """Design a TAR cloning experiment programmatically.
 
@@ -298,7 +385,8 @@ class TARDesigner:
         self.find_templates(template_folder)
         self.rationalize_selections()
         instructions = self.write_instructions()
-        assembly = self.create_assembly()
+        self.diagnose()
+        assembly = self.create_assembly(proceed_on_ambiguity=proceed_on_ambiguity)
         assembly.name = name
 
         return TARResult(
@@ -307,4 +395,9 @@ class TARDesigner:
             primers=self.primers,
             instructions=instructions,
             missing_primers=self.missing_primers,
+            diagnostics=self.diagnostics,
+            specificity=self.specificity,
+            notes=self.assembly_notes,
+            provenance=self.provenance,
+            history=self.history,
         )

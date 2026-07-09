@@ -1,7 +1,7 @@
 # tests/test_real_world_cases.py
 
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -33,7 +33,7 @@ def load_expected_instructions(test_case_dir):
     if not instructions_file.exists():
         return []
     df = pd.read_csv(instructions_file, sep = '\t')
-    return df.values.tolist()
+    return df.to_numpy()
 
 def load_expected_assembly(test_case_dir, assembly_type='tar'):
     """Load expected assembled sequence from GenBank file."""

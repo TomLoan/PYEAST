@@ -36,6 +36,8 @@ import matplotlib.pyplot as plt
 from Bio import SeqIO
 from dna_features_viewer import CircularGraphicRecord, GraphicFeature, GraphicRecord
 
+from pyeast.utils.sequence_utils import is_pyeast_component
+
 
 def visualise_genbank(gb_file_path):
     """
@@ -55,13 +57,13 @@ def visualise_genbank(gb_file_path):
 
     # Define your organization's color palette
     color_palette = [
-        "#1E22AA", "#004B87", "#6D2077", "#007377", "#007A53", "#DF1995",
-        "#E87722", "#FFB81C", "#9FAEE5", "#71CC98", "#78BE20", "#2DCCD3"
+        "#6468D8", "#2F5879", "#5E4661", "#578385", "#A17179", "#D482B6",
+        "#DDA87F", "#F5D99E", "#BAC4E6", "#9FE9BF", "#ACD37D", "#94E1E6"
     ]
     color_cycle = itertools.cycle(color_palette)
 
     for feature in record.features:
-        if feature.type not in ["source", "primer_bind"]:
+        if is_pyeast_component(feature):
             start = int(feature.location.start)
             end = int(feature.location.end)
             strand = feature.location.strand

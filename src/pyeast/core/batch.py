@@ -35,7 +35,6 @@ import csv
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import openpyxl
 import pandas as pd
@@ -45,12 +44,17 @@ from Bio.SeqFeature import CompoundLocation
 from Bio.SeqRecord import SeqRecord
 from tabulate import tabulate
 
-logger = logging.getLogger(__name__)
-
 from pyeast.utils.path_utils import get_output_path, get_primers_path, get_templates_path
 from pyeast.utils.primer_utils import get_primer_locations, rationalize_primers
-from pyeast.utils.sequence_utils import get_templates, rationalize_templates
+from pyeast.utils.sequence_utils import (
+    INTEGRATION_CONSTRUCT_DESCRIPTION,
+    TAR_CONSTRUCT_DESCRIPTION,
+    get_component_features,
+    get_templates,
+    rationalize_templates,
+)
 
+logger = logging.getLogger(__name__)
 
 class BatchDesigner:
     """Designer class for batch DNA assembly experiments.
@@ -73,9 +77,9 @@ class BatchDesigner:
     def __init__(self,
                  reuse_limit = 5,
                  batch_size: int = 96,
-                 primer_folder: Optional[Path] = None,
-                 template_folder: Optional[Path] = None,
-                 output_folder: Optional[Path] = None):
+                 primer_folder: Path | None = None,
+                 template_folder: Path | None = None,
+                 output_folder: Path | None = None):
         """Initialize BatchDesigner with specified parameters.
 
         Args:
@@ -116,9 +120,9 @@ class BatchDesigner:
         Only loads constructs suitable for batch processing (from tar/integrate commands).
         Automatically excludes cassettes from replace/delete commands and gg assemblies.
         """
-        VALID_DEFINITIONS = {
-            "Plasmid assembled by TAR cloning simulation",
-            "Assembled sequence for genomic integration"
+        valid_definitions = {
+            TAR_CONSTRUCT_DESCRIPTION,
+            INTEGRATION_CONSTRUCT_DESCRIPTION,
         }
         self.available_constructs = {}
 
@@ -131,7 +135,7 @@ class BatchDesigner:
 
                 # Check if this is a valid target for batch processing
                 description = record.description
-                if description not in VALID_DEFINITIONS:
+                if description not in valid_definitions:
                     skipped_count += 1
                     # self.console.print(f"[dim]Skipped {filename.stem} (not a TAR/integrate output)[/dim]")
                     continue
@@ -166,7 +170,7 @@ class BatchDesigner:
                     # Check if this is a valid target for batch processing
                     description = record.description
                     # print(description)
-                    if description not in VALID_DEFINITIONS:
+                    if description not in valid_definitions:
                           skipped_count += 1
                           continue
 
@@ -197,7 +201,7 @@ class BatchDesigner:
         if not self.available_constructs:
             raise ValueError(
                 "No valid GenBank files found for batch processing.\n"
-                "Ensure Output directory is correct. \n" 
+                "Ensure Output directory is correct. \n"
                 "Make sure you've run 'tar' or 'integrate' commands first to generate constructs."
             )
 
@@ -209,7 +213,7 @@ class BatchDesigner:
 
         Checks that each construct:
         - Has a topology annotation
-        - Has at least one part (misc_feature)
+        - Has at least one part (PYEAST_component or misc_feature)
         - Each part has proper primer annotations:
             - Forward primer at start (strand=1)
             - Reverse primer at end (strand=-1)
@@ -231,8 +235,8 @@ class BatchDesigner:
 
             is_circular = record.annotations['topology'].lower() == 'circular'
 
-            # Get parts
-            parts = [f for f in record.features if f.type == "misc_feature"]
+            # Get parts (PYEAST-marked components, or bare misc_features for legacy files)
+            parts = get_component_features(record)
             if not parts:
                 self.validation_errors.append(f"{name}: No parts (misc_feature) found")
                 continue
@@ -305,25 +309,24 @@ class BatchDesigner:
         """Extract component and primer information from GenBank annotations."""
         components = []
 
-        # First extract all components
-        for feature in record.features:
-            if feature.type == "misc_feature":
-                if "label" not in feature.qualifiers:
-                    raise ValueError(f"Component at position {feature.location} missing label")
+        # First extract all components (PYEAST-marked, or bare misc_features for legacy files)
+        for feature in get_component_features(record):
+            if "label" not in feature.qualifiers:
+                raise ValueError(f"Component at position {feature.location} missing label")
 
-                component_seq = feature.extract(record.seq)
-                component = {
-                    'name': feature.qualifiers['label'][0],
-                    'sequence': str(component_seq),
-                    'start': int(feature.location.start),
-                    'end': int(feature.location.end),
-                    'forward_primer': None,
-                    'reverse_primer': None
-                }
-                components.append(component)
+            component_seq = feature.extract(record.seq)
+            component = {
+                'name': feature.qualifiers['label'][0],
+                'sequence': str(component_seq),
+                'start': int(feature.location.start),
+                'end': int(feature.location.end),
+                'forward_primer': None,
+                'reverse_primer': None
+            }
+            components.append(component)
 
         if not components:
-            raise ValueError("No components (misc_features) found in record")
+            raise ValueError("No components (PYEAST_component or misc_features) found in record")
 
         # Sort components by position
         components.sort(key=lambda x: x['start'])
@@ -918,7 +921,8 @@ class BatchDesigner:
                         well = reaction_wells[well_key]
                         required_wells.append(well)
                     else:
-                        logger.warning(f"Could not find well for {well_key[1]} in batch {batch_num} (use {curent_use}, repeat {repeat_number}, limit {self.reuse_limit})")
+                        logger.warning(f"Could not find well for {well_key[1]} in batch {batch_num} \
+                                       (use {curent_use}, repeat {repeat_number}, limit {self.reuse_limit})")
                 # Create assembly group row
                 row = [
                     batch_num,
@@ -1135,7 +1139,7 @@ class BatchDesigner:
         return str(janus_file)
 
 
-    def _get_template_position(self, template_name: str) -> tuple[Optional[str], Optional[str]]:
+    def _get_template_position(self, template_name: str) -> tuple[str | None, str | None]:
         """Find the plate and well position for a given template.
 
         First checks if the template is a contig/chromosome in the genome mapping file
@@ -1336,7 +1340,7 @@ class BatchDesigner:
             topology = record.annotations.get('topology', '').lower()
 
             # Count components
-            component_count = sum(1 for f in record.features if f.type == "misc_feature")
+            component_count = len(get_component_features(record))
 
             input_data.append([
                 name,

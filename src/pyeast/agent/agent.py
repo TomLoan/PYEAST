@@ -2,7 +2,13 @@
 
 import warnings
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    # python-dotenv ships in the optional 'agent' extra. Without it, .env files
+    # are simply not loaded; providers that need no extra (ollama, openai) still work.
+    def load_dotenv(*args: object, **kwargs: object) -> bool:
+        return False
 
 from pyeast.agent.providers import AnthropicProvider, OllamaProvider, OpenAIProvider
 from pyeast.agent.tools import TOOL_SCHEMAS, dispatch_tool
@@ -104,7 +110,7 @@ Use these when estimating synthesis costs or gBlock feasibility (limit ~3–4 kb
 - **Deletion cassette** = upstream_homology(~300 bp) + URA3(~1.1 kb) + repeat_seq(~160 bp) + downstream_homology(~300 bp) ≈ **1.9 kb**
 - **Replacement cassette** = upstream_homology(~300 bp) + URA3(~1.1 kb) + replacement_seq + repeat_seq(~160 bp) + downstream_homology(~300 bp)
   - e.g. replacement_seq = pTDH3(~700 bp) + HFBI(~400 bp) + AGA2 ORF(~600 bp) = 1.7 kb → total ≈ **3.5 kb** (approaches limit)
-- **TAR/integration cassette** = multiple PCR-amplified parts assembled in yeast — no single large synthesis needed, individual parts are typically 200–900 bp each
+- **TAR/integration cassette** = multiple PCR-amplified parts assembled in yeast — individual parts are typically 200–3000 bp each
 - URA3 pop-in/pop-out is always 2 steps per modification; plan the build order so URA3 can be recycled between modifications
 
 ## CRITICAL: Missing Parts Rule

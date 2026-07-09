@@ -3,13 +3,12 @@
 This module handles configuration loading and data path resolution.
 Configuration priority (highest to lowest):
 1. Environment variables (PYEAST_DATA_DIR, PYEAST_OUTPUT_DIR)
-2. Config file (~/.pyeast/config.yaml)
+2. Config file (~/PYEAST/config.yaml)
 3. Default locations (~/PYEAST/data/)
 """
 
 import os
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -21,6 +20,21 @@ class PyeastConfig:
         """Initialize configuration by resolving paths in priority order."""
         self.data_dir = self._resolve_data_dir()
         self.output_dir = self._resolve_output_dir()
+        self.preferred_templates = self._resolve_preferred_templates()
+
+    def _resolve_preferred_templates(self) -> list:
+        """Resolve the preferred-templates list from the config file.
+
+        When a part is found in several templates, these are preferred (matched against the
+        template record name inside the .gb, not the filename or part name). Empty by default,
+        in which case the shortest-matching-template sorter alone decides.
+        """
+        config_data = self._load_config_file()
+        if config_data and 'preferred_templates' in config_data:
+            value = config_data['preferred_templates']
+            if isinstance(value, list):
+                return value
+        return []
 
     def _resolve_data_dir(self) -> Path:
         """Resolve data directory location.
@@ -44,7 +58,7 @@ class PyeastConfig:
             if path.exists():
                 return path.resolve()
 
-        # Priority 3: Ufault user directory Fallback for legancy installs 
+        # Priority 3: Default user directory. Fallback for legacy installs.
         # Not intended for normal use
         return (Path.home() / "PYEAST" / "data").resolve()
 
@@ -66,12 +80,22 @@ class PyeastConfig:
         if config_data and 'output_dir' in config_data:
             return Path(config_data['output_dir']).resolve()
 
-        # Priority 3: Default user directory  
+        # Priority 3: Default user directory
         return (Path.home() / "PYEAST" / "output").resolve()
 
-    def _load_config_file(self) -> Optional[dict]:
-        """Load configuration from ~/.pyeast/config.yaml if it exists."""
-        config_file = Path.home() / ".pyeast" / "config.yaml"
+    def _load_config_file(self) -> dict | None:
+        """Load configuration from ~/PYEAST/config.yaml if it exists.
+
+        Falls back to the legacy ~/.pyeast/config.yaml location (read-only) so
+        installs created before the layout change keep working until the user
+        re-runs `pyeast init`.
+        """
+        config_file = Path.home() / "PYEAST" / "config.yaml"
+        if not config_file.exists():
+            # Legacy migration fallback (read-only; never written to again)
+            legacy_file = Path.home() / ".pyeast" / "config.yaml"
+            if legacy_file.exists():
+                config_file = legacy_file
         if config_file.exists():
             try:
                 with open(config_file) as f:
@@ -84,7 +108,7 @@ class PyeastConfig:
         return None
 
 # Singleton instance
-_config: Optional[PyeastConfig] = None
+_config: PyeastConfig | None = None
 
 
 def get_config() -> PyeastConfig:
