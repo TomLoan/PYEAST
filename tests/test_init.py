@@ -203,6 +203,24 @@ class TestInitCommand:
         assert result.exit_code != 0
         assert "Clone failed" in result.output
 
+    def test_init_no_args_git_not_installed(self, runner, isolated_config):
+        """Test init with no args when git is not installed at all.
+
+        subprocess.run raises FileNotFoundError before returning a result; the
+        command must abort with actionable guidance instead of a raw traceback.
+        """
+        clone_dir = isolated_config['home'] / "PYEAST" / "data"
+
+        with patch('pyeast.cli.main._DATA_REPO_CLONE_DIR', clone_dir), \
+             patch('subprocess.run', side_effect=FileNotFoundError("[WinError 2]")):
+            result = runner.invoke(cli, ['init'])
+
+        assert result.exit_code != 0
+        assert result.exception is None or isinstance(result.exception, SystemExit)
+        assert "git not found" in result.output
+        assert "git-scm.com" in result.output
+        assert "--data-dir" in result.output
+
     def test_init_already_cloned_not_recloned(self, runner, isolated_config):
         """When the clone dir already exists, choosing clone again detects it and does not re-clone.
 

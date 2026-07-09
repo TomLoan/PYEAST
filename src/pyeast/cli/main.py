@@ -1374,10 +1374,17 @@ def _clone_data_repo(subprocess) -> None:
         return
 
     console.print(f"Cloning PYEAST data repository from {DATA_REPO_URL} ...")
-    result = subprocess.run(
-        ["git", "clone", DATA_REPO_URL, str(clone_dir)],
-        capture_output=True, text=True
-    )
+    try:
+        result = subprocess.run(
+            ["git", "clone", DATA_REPO_URL, str(clone_dir)],
+            capture_output=True, text=True
+        )
+    except FileNotFoundError:
+        console.print("[red]git not found.[/red] PYEAST needs git to download its data.")
+        console.print("Install git from https://git-scm.com/ and run 'pyeast init' again,")
+        console.print(f"or download the data manually from {DATA_REPO_URL}")
+        console.print("and register it with 'pyeast init --data-dir <path>'.")
+        raise click.Abort()
     if result.returncode != 0:
         console.print(f"[red]Clone failed:[/red]\n{result.stderr}")
         raise click.Abort()

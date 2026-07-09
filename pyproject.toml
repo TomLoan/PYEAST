@@ -9,7 +9,7 @@ license-files = ["LICENSE.txt"]
 authors = [
     { name = "Thomas Loan", email = "Tom.Loan27@gmail.com" },
 ]
-keywords = ["yeast", "synthetic-biology", "cloning", "primer-design", "bioinformatics", "TAR", "golden-gate"]
+keywords = ["yeast", "synthetic-biology", "cloning", "primer-design", "bioinformatics", "golden-gate"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
