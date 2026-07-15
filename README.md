@@ -1,5 +1,6 @@
 [![DOI](https://zenodo.org/badge/946400824.svg)](https://doi.org/10.5281/zenodo.15393309)
-[![Installation Test](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml/badge.svg)](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml)
+[![tests](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml/badge.svg)](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml)
+[![PyPI version](https://shields.io/pypi/v/pyeast.svg)](https://pypi.org/project/pyeast/)
 
 # PYEAST
 
