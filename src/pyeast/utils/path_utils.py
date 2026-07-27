@@ -93,6 +93,34 @@ def get_component_libraries_path(private: bool = False) -> Path:
     return get_data_path("component_libraries")
 
 
+def library_has_plasmids(name: str) -> bool:
+    """Check whether a component library can be used for Golden Gate assembly.
+
+    A library qualifies if it has a 'plasmids' subfolder holding at least one
+    GenBank file. Both the public and private bases are checked, since a library
+    may exist in either or both.
+
+    Args:
+        name: Component library folder name (not a path)
+
+    Returns:
+        True if a usable plasmids folder was found
+    """
+    candidates = [
+        get_component_libraries_path() / name / "plasmids",
+        get_component_libraries_path(private=True) / name / "plasmids",
+    ]
+
+    for plasmid_dir in candidates:
+        if not plasmid_dir.is_dir():
+            continue
+        for pattern in ("*.gb", "*.gbk"):
+            if any(plasmid_dir.glob(pattern)):
+                return True
+
+    return False
+
+
 def get_integration_sites_path(private: bool = False) -> Path:
     """Get path to integration sites directory.
 

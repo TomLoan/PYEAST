@@ -227,17 +227,14 @@ class ggDesigner:
             ValueError: If no assemblies have been selected
             RuntimeError: If assembly simulation fails or produces unexpected results
         """
-        from pathlib import Path
-
-
         # Construct both public and private plasmid paths
         public_plasmids = self.gg_plasmids
 
         try:
-            relative_path = public_plasmids.relative_to("data")
-            private_plasmids = Path("data/private") / relative_path
+            private_plasmids = get_private_equivalent(public_plasmids)
         except ValueError:
-            private_plasmids = Path("data/private") / public_plasmids.name
+            # Path is not within data directory, so no private equivalent exists
+            private_plasmids = None
 
         # Create repository and load records from both locations
         repository = dc.SequenceRepository()
@@ -259,7 +256,7 @@ class ggDesigner:
                 )
 
             # Load from private directory if it exists
-            if private_plasmids.exists():
+            if private_plasmids and private_plasmids.exists():
                 repository.import_records(
                     folder=str(private_plasmids),
                     use_file_names_as_ids=False

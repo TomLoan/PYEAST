@@ -42,7 +42,7 @@ from pyeast.core.gg import ggDesigner
 from pyeast.core.integration import IntegrationDesigner, IntegrationResult
 from pyeast.core.replace import ReplaceDesigner
 from pyeast.core.tar import TARDesigner, TARResult
-from pyeast.utils.path_utils import ensure_output_dir_exists, get_component_libraries_path, get_primers_path, get_templates_path
+from pyeast.utils.path_utils import ensure_output_dir_exists, get_component_libraries_path, get_primers_path, get_templates_path, library_has_plasmids
 from pyeast.utils.sequence_utils import get_component_features
 from pyeast.utils.visualisation import save_figure, visualise_genbank
 
@@ -206,8 +206,14 @@ def handle_machine_instructions(designer: BatchDesigner, output_prefix: str) -> 
         pass
 # Could edit this function so the user can select more than one library if desired?
 # Not sure What I'd do about name conflicts in this situation though, more trouble than it's worth?
-def get_component_dir() -> Path:
-    """Get component directory with simple autocompletion, including private libraries"""
+
+def get_component_dir(require_plasmids: bool = False) -> Path:
+    """Get component directory with simple autocompletion, including private libraries
+
+    Args:
+        require_plasmids: If True, only offer libraries with a plasmids folder
+            containing GenBank files, as required for Golden Gate assembly.
+    """
     # Check both public and private base directories
     base_dir = get_component_libraries_path()
     private_base_dir = get_component_libraries_path(private=True)
@@ -237,13 +243,25 @@ def get_component_dir() -> Path:
         console.print("[red]No component libraries found[/red]")
         raise click.Abort()
 
+    # Drop libraries that can't satisfy the caller's requirements
+    if require_plasmids:
+        subdirs = [name for name in subdirs if library_has_plasmids(name)]
+
+        if not subdirs:
+            console.print("[red]No component libraries with plasmids found[/red]")
+            console.print(
+                "[yellow]Golden Gate needs <library>/plasmids/ containing .gb files[/yellow]"
+            )
+            raise click.Abort()
+
     # Create completer
     dir_completer = WordCompleter(subdirs, ignore_case=True)
 
     session = PromptSession()
 
     # Show available directories
-    table = Table(title="Available Component Directories")
+    title = "Available Golden Gate Libraries" if require_plasmids else "Available Component Directories"
+    table = Table(title=title)
     table.add_column("Name", style="cyan")
     for subdir in subdirs:
         table.add_row(subdir)
@@ -256,13 +274,16 @@ def get_component_dir() -> Path:
                 completer=dir_completer
             )
 
-            # Always return the public path - load_sequences will handle both
-            selected_dir = base_dir / user_input
-
-            # Verify at least one location exists
-            private_dir = private_base_dir / user_input
-            if selected_dir.exists() or private_dir.exists():
-                return selected_dir
+            # Only accept names that were offered, so filtered-out libraries
+            # can't be selected by typing them. Matching is case-insensitive to
+            # agree with the completer.
+            selected = next(
+                (name for name in subdirs if name.lower() == user_input.strip().lower()),
+                None
+            )
+            if selected:
+                # Always return the public path - load_sequences will handle both
+                return base_dir / selected
 
             console.print("[red]Invalid directory selection[/red]")
 
@@ -1248,8 +1269,8 @@ def run_batch_interactive_mode(designer: BatchDesigner):
 def run_gg_interactive_mode(designer: ggDesigner):
     """Run TAR design in interactive mode"""
     try:
-        # Get components directory
-        components_dir = get_component_dir()
+        # Get components directory - golden gate needs plasmids to assemble from
+        components_dir = get_component_dir(require_plasmids=True)
 
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
             # Load and process sequences
