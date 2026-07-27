@@ -1,5 +1,6 @@
 [![DOI](https://zenodo.org/badge/946400824.svg)](https://doi.org/10.5281/zenodo.15393309)
-[![Installation Test](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml/badge.svg)](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml)
+[![tests](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml/badge.svg)](https://github.com/TomLoan/PYEAST/actions/workflows/install-test.yml)
+[![PyPI version](https://shields.io/pypi/v/pyeast.svg)](https://pypi.org/project/pyeast/)
 
 # PYEAST
 
@@ -11,17 +12,23 @@ For full methodological details, see our [publication](https://doi.org/10.1038/s
 
 ## Prerequisites
 
-- **Python** (3.12 or later) — [python.org](https://www.python.org/downloads/)
-- **Git** — [git-scm.com](https://git-scm.com/downloads)
-- **uv** - [docs.astral.sh](https://docs.astral.sh/uv/getting-started/installation/)
+- **Python** (3.12 or later) - [python.org](https://www.python.org/downloads/)
+- **Git** - [git-scm.com](https://git-scm.com/downloads) (used by `pyeast init` to download the sequence data)
+- **uv** (optional) - [docs.astral.sh](https://docs.astral.sh/uv/getting-started/installation/), only needed for the isolated `uv tool install` route below
 
 ## Installation
 
 ```bash
-uv tool install git+https://github.com/TomLoan/PYEAST.git
+pip install pyeast
 
 # Download the sequence data automatically
 pyeast init
+```
+
+Prefer an isolated install for the command-line tool? Use [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/) instead:
+
+```bash
+uv tool install pyeast    # or: pipx install pyeast
 ```
 
 `pyeast init` clones the [data repository](https://github.com/TomLoan/PYEAST_data) to `~/PYEAST/data/` and configures PYEAST automatically. If you have already downloaded the data elsewhere, point PYEAST at it instead:
@@ -87,7 +94,7 @@ To add a new Golden Gate kit, create a new subfolder in `component_libraries/` a
 The default **Anthropic** backend requires an extra that is **not installed by default**. Enable it by installing PYEAST with the `agent` extra:
 
 ```bash
-uv tool install "git+https://github.com/TomLoan/PYEAST.git#egg=pyeast[agent]"
+pip install "pyeast[agent]"    # or: uv tool install "pyeast[agent]"
 ```
 
 If you have already installed PYEAST, re-run the command above to add the extra. Running the default backend without it exits with an error telling you to install `pyeast[agent]`.
@@ -165,7 +172,7 @@ Verify that your data directory contains the expected folder structure and that 
 Reinstall to ensure all dependencies are present:
 
 ```bash
-pip install git+https://github.com/TomLoan/PYEAST.git
+pip install --upgrade --force-reinstall pyeast
 ```
 
 ## Python API
