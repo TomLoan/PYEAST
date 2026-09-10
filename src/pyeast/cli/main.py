@@ -1579,7 +1579,8 @@ def integrate(homology_length):
 @click.option('--ura3_file',
               type=click.Path(exists=True, path_type=Path),
               default=None,
-              help='Path to URA3 marker file (default: URA3.fasta from data/component_libraries/Saccharomyces_cerevisiae/)')
+              help='Path to URA3 marker file (default: URA3.fasta from data/component_libraries/Saccharomyces_cerevisiae/) ' \
+              'If counter selection with FOA fails try using URA3MX')
 def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome_file, ura3_file):
     """Design scarless deletions in Saccharomyces cerevisiae.
     \b\n
@@ -1650,7 +1651,8 @@ def delete(upstream_homology_len, downstream_homology_len, repeat_length, genome
 @click.option('--ura3_file',
               type=click.Path(exists=True, path_type=Path),
               default=None,
-              help='Path to URA3 marker file (default: URA3.fasta from data/component_libraries/Saccharomyces_cerevisiae/)')
+              help='Path to URA3 marker file (default: URA3.fasta from data/component_libraries/Saccharomyces_cerevisiae/) ' \
+              'If counter selection with FOA fails try using URA3MX')
 def replace(upstream_homology_len, downstream_homology_len, repeat_length, genome_file, ura3_file):
     """Design pop-in/pop-out replacements in Saccharomyces cerevisiae
     \b\n
