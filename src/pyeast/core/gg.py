@@ -133,13 +133,13 @@ class ggDesigner:
 
         if public_plasmids.exists():
             found_any_dir = True
-            plasmid_files.extend(list(public_plasmids.glob('*.gb')))
-            plasmid_files.extend(list(public_plasmids.glob('*.gbk')))
+            plasmid_files.extend(list(public_plasmids.glob('*.gb', case_sensitive=False)))
+            plasmid_files.extend(list(public_plasmids.glob('*.gbk', case_sensitive=False)))
 
         if private_plasmids and private_plasmids.exists():
             found_any_dir = True
-            plasmid_files.extend(list(private_plasmids.glob('*.gb')))
-            plasmid_files.extend(list(private_plasmids.glob('*.gbk')))
+            plasmid_files.extend(list(private_plasmids.glob('*.gb', case_sensitive=False)))
+            plasmid_files.extend(list(private_plasmids.glob('*.gbk', case_sensitive=False)))
 
         if not found_any_dir:
             if private_plasmids:

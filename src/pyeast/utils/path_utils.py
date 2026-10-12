@@ -115,7 +115,7 @@ def library_has_plasmids(name: str) -> bool:
         if not plasmid_dir.is_dir():
             continue
         for pattern in ("*.gb", "*.gbk"):
-            if any(plasmid_dir.glob(pattern)):
+            if any(plasmid_dir.glob(pattern, case_sensitive=False)):
                 return True
 
     return False

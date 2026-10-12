@@ -124,7 +124,7 @@ def load_sequences(directory: str) -> dict[str, SeqRecord]:
         found_any = True
         try:
             for filename in os.listdir(public_dir):
-                if filename.endswith(('.fasta', '.fa', 'fsa')):
+                if filename.casefold().endswith(('.fasta', '.fa', '.fsa')):
                     file_path = public_dir / filename
                     for record in SeqIO.parse(file_path, "fasta"):
                         name = record.id.split()[0]
@@ -138,7 +138,7 @@ def load_sequences(directory: str) -> dict[str, SeqRecord]:
         found_any = True
         try:
             for filename in os.listdir(private_dir):
-                if filename.endswith(('.fasta', '.fa', 'fsa')):
+                if filename.casefold().endswith(('.fasta', '.fa', '.fsa')):
                     file_path = private_dir / filename
                     for record in SeqIO.parse(file_path, "fasta"):
                         name = record.id.split()[0]
@@ -192,8 +192,8 @@ def get_templates(parts: list[SeqRecord], directory: str) -> dict[str, list[str]
 
         for template_file in os.listdir(search_dir):
             file_path = search_dir / template_file
-            if str(file_path).endswith(('.fasta', '.fsa', '.fa', '.gb', '.gbk')):
-                format_type = "fasta" if str(file_path).endswith(('.fasta', '.fa', '.fsa')) else "genbank"
+            if str(file_path).casefold().endswith(('.fasta', '.fsa', '.fa', '.gb', '.gbk')):
+                format_type = "fasta" if str(file_path).casefold().endswith(('.fasta', '.fa', '.fsa')) else "genbank"
                 for record in SeqIO.parse(file_path, format_type):
                     templates[record.name] = record.seq
 

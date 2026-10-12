@@ -167,7 +167,7 @@ def get_primer_locations(primers: dict[str, Seq], directory: str) -> tuple[dict[
             continue
 
         for spec_sheet in os.listdir(search_dir):
-            if spec_sheet.endswith('.xlsx'):
+            if spec_sheet.casefold().endswith('.xlsx'):
                 df = pd.read_excel(search_dir / spec_sheet, header=0)
                 if len(df.columns) == 4 and all(col in df.columns for col in ['Plate or Box ID', 'Position', 'Sequence Name', 'Sequence']):
                     df['Sequence'] = df['Sequence'].str.replace(" ", "").str.strip()
