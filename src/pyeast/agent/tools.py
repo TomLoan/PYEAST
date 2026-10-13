@@ -17,7 +17,7 @@ from pyeast.utils.path_utils import (
     get_templates_path,
 )
 
-_SEQ_EXTENSIONS = {".fasta", ".fa", ".gb", ".genbank", ".gbk"}
+_SEQ_EXTENSIONS = {".fasta", ".fsa", ".fa", ".gb", ".genbank", ".gbk"}
 
 # ---------------------------------------------------------------------------
 # Tool schemas
@@ -385,7 +385,8 @@ def _handle_read_component(name: str, library_name: str) -> dict:
     priv_base = get_component_libraries_path(private=True)
 
     for base in [priv_base, pub_base]:  # private takes precedence
-        for ext in (".fasta", ".fa", ".gb", ".genbank", ".gbk"):
+        for ext in (".fasta", ".fsa", ".fa", ".FASTA", ".FSA", ".FA",
+                    ".gb", ".genbank", ".gbk", ".GB", ".GENBANK", ".GBK"):
             file_path = base / library_name / f"{name}{ext}"
             if file_path.exists():
                 fmt = "genbank" if ext in (".gb", ".genbank", ".gbk") else "fasta"
@@ -648,7 +649,9 @@ def _handle_design_replacement(
                 "error": f"Component '{replacement_component_name}' not found in library '{replacement_library_name}'",
             }
         from Bio import SeqIO
-        replacement_record = SeqIO.read(str(matches[0]), matches[0].suffix.lstrip(".") or "fasta")
+        match = matches[0]
+        fmt = "genbank" if match.suffix.lower() in (".gb", ".genbank", ".gbk") else "fasta"
+        replacement_record = SeqIO.read(str(match), fmt)
     elif replacement_sequence:
         replacement_record = SeqRecord(
             Seq(replacement_sequence.upper()),

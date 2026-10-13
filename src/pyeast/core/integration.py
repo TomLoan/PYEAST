@@ -168,16 +168,18 @@ class IntegrationDesigner:
             if not search_dir.exists():
                 continue
 
-            for file_path in search_dir.glob("*.fasta"):
-                records = list(SeqIO.parse(file_path, "fasta"))
-                if len(records) == 2:
-                    site_name = file_path.stem
-                    int_sites[site_name] = (records[0], records[1])
-                else:
-                    import warnings
-                    warnings.warn(
-                        f"Skipping {file_path.name} - expected 2 sequences, found {len(records)}"
-                    )
+            file_extensions = ["*.fasta", "*.fsa", "*.fa"]
+            for ext in file_extensions:
+                for file_path in search_dir.glob(ext, case_sensitive=False):
+                    records = list(SeqIO.parse(file_path, "fasta"))
+                    if len(records) == 2:
+                        site_name = file_path.stem
+                        int_sites[site_name] = (records[0], records[1])
+                    else:
+                        import warnings
+                        warnings.warn(
+                            f"Skipping {file_path.name} - expected 2 sequences, found {len(records)}"
+                        )
 
         if not int_sites:
             raise FileNotFoundError(f"Integration sites directory not found: {directory}")
