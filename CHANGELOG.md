@@ -5,6 +5,11 @@ All notable changes to PYEAST are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-10-16
+File extensions are now matched case-insensitively, so files such as `.FASTA` or `.GB` are found,
+and `.fsa` is accepted wherever FASTA files are read. The `--ura3_file` help for `pyeast delete`
+and `pyeast replace` now suggests trying URA3MX if FOA counter-selection fails.
+
 ## [2.0.1] - 2026-07-30 
 pyeast gg now only allows folders containing a correctly configured collection of golden 
 gate plasmids to be selected.  
