@@ -1493,7 +1493,21 @@ def init(data_dir, output_dir):
 
         if choice == "3":
             new_output = click.prompt("Output directory path", type=click.Path())
-            output_path = Path(new_output)
+            output_path = Path(new_output.strip('"\'')).expanduser()
+
+            if not output_path.is_absolute(): 
+                console.print("[red]Please enter a full pth, e.g. C:\\Users\\you\\PYEAST\\output[/red]")
+                raise click.Abort()
+
+            if not output_path.exists(): 
+                if not click.confirm(f"{output_path} doen't exist. Create it?"):
+                    raise click.Abort() 
+            try:
+                output_path.mkdir(parents=True)
+            except OSError as e: 
+                console.print(f"[red]Could not create {output_path}[/red]") 
+                raise click.Abort()
+
             _write_config(config.data_dir, output_path.resolve())
             console.print(f"[green]Output directory set to {output_path}[/green]")
             console.print(f"[dim]Config saved to: {Path.home() / 'PYEAST' / 'config.yaml'}[/dim]")
